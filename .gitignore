@@ -1,0 +1,7 @@
+documents
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+packrat/lib*/
+packrat/src/
