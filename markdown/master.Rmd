@@ -1,0 +1,33 @@
+---
+title: "Developing a 2008 Baseline for the CBP Stream Health Outcome Indicator: DRAFT"
+author: "Zachary M. Smith"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: '6'
+    toc_float: yes
+bibliography: citations.bib
+link-citations: true
+---
+
+`r Sys.Date()`
+
+```{r, echo=FALSE, cache=FALSE}
+evaluate <- TRUE
+cache.me <- TRUE
+run.cedr.acquisition <- FALSE
+```
+
+# Abstract
+```{r child = 'sections/abstract.Rmd', eval=TRUE}
+
+```
+
+# Introduction
+```{r child = 'sections/introduction.Rmd', eval=TRUE}
+
+```
+
+# Citations
+
