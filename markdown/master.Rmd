@@ -29,5 +29,15 @@ run.cedr.acquisition <- FALSE
 
 ```
 
+# Data Acquisition
+```{r child = 'sections/data_acquisition_cedr.Rmd', eval=TRUE}
+
+```
+
+# Prepare Data
+```{r child = 'sections/prepare_data.Rmd', eval=TRUE}
+
+```
+
 # Citations
 
