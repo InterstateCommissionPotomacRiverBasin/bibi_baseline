@@ -1,0 +1,33 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "December 27, 2017"
+output: html_document
+---
+
+```{r, fig.width = 10, fig.height = 10}
+bibi.sub %>% 
+  group_by(period, spatial, agency_code) %>% 
+  summarize(count = n()) %>% 
+  ungroup() %>% 
+  arrange(count) %>% 
+  mutate(agency_code = factor(agency_code, levels = unique(agency_code))) %>% 
+  ggplot(aes(agency_code, count)) +
+  geom_bar(stat = "identity", fill = "#999999") +
+  coord_flip() +
+  facet_wrap(~period + spatial)
+```
+
+```{r}
+test <- bibi.sub %>% 
+  group_by(period, spatial, agency_code) %>% 
+  summarize(count = n()) %>% 
+  ungroup() %>% 
+  arrange(count) %>% 
+  mutate(agency_code = factor(agency_code, levels = unique(agency_code)))
+```
+
+```{r}
+table(bibi.sub$states)
+```
+

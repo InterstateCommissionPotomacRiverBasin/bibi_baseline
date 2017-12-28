@@ -1,0 +1,81 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "December 28, 2017"
+output: html_document
+---
+
+```{r}
+
+huc8.df <- huc12.df %>% 
+  select(huc_8) %>% 
+  distinct()
+bibi.nest <- bibi.sub %>% 
+  #filter(period == "2004_2008") %>% 
+  #full_join(huc12.df, by = c("huc_12", "huc_8", "acres", "states", "total_acres")) %>% 
+  full_join(huc8.df, by = "huc_8") %>% 
+  select(huc_8, rating, period) %>% 
+  group_by(huc_8, period) %>% 
+  nest() %>% 
+  mutate(empty = map_lgl(data, function(i) any(is.na(i))),
+         length = purrr::map(data, function(i) length(unlist(i))),
+         unique = purrr::map(data, function(i) length(unique(unlist(i)))),
+         sel_rating = purrr::map(data, function(i) {
+           if(length(unique(unlist(i))) == 1) {
+             unique(unlist(i))
+           } else {
+             as.character(NA)
+           }
+         }),
+         sel_rating = if_else(unique == 1 & is.na(sel_rating),
+                              "insufficient",
+                              as.character(sel_rating)))
+
+```
+
+
+```{r}
+boot.i <- 10
+boot.df <- purrr::map(c("2000_2008", "2004_2008", "2000_2005", "2006_2011"), function(period.i) {
+  bibi.nest.period <- bibi.nest %>% 
+    filter(period == period.i | is.na(period))
+  
+  purrr::map(c(10, 50, 100, 500, 1000, 1500, 2000), function(boot.i) {
+  bootstrap_ratings(bibi.nest.period, 100, boot.i)
+    }) %>% 
+  bind_rows() %>% 
+  mutate(bootstrap_sample = factor(bootstrap_sample, levels = unique(bootstrap_sample)),
+         period = period.i)
+  
+}) %>% 
+  bind_rows() %>% 
+  select(period, everything())
+```
+
+```{r, fig.width = 8, fig.height = 5}
+boot.df %>% 
+  mutate(period = factor(period, levels = c("2000_2005", "2006_2011",
+                                            "2004_2008", "2000_2008"))) %>% 
+ggplot(aes(bootstrap_sample, mean, fill = rating)) +
+  geom_bar( position = "dodge", stat = "identity") +
+  scale_fill_manual(values = c("attaining" = "#56B4E9",
+                               "poor" = "#E69F00",
+                               "insufficient" = "#999999")) +
+  geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),
+                width = 0.2,                    # Width of the error bars
+                position = position_dodge(0.9)) +
+  facet_wrap(~period)
+```
+
+```{r}
+boot.df2 <- boot.df %>% 
+  filter(rating != "insufficient") %>% 
+  group_by(period, bootstrap_sample, n) %>% 
+  mutate(total = sum(mean),
+         percent = mean / total * 100) 
+```
+
+```{r}
+
+```
+

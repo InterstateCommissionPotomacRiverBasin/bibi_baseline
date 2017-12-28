@@ -1,0 +1,55 @@
+---
+title: "Rating Procedures"
+author: "Zachary M. Smith"
+date: "December 26, 2017"
+output: html_document
+---
+
+
+```{r}
+sum.bibi.sub <- sum.bibi.sub %>% 
+  mutate(rating = rate_index_2(sum.bibi.sub, mean_score))
+```
+
+```{r}
+raw.rating.count <- sum.bibi.sub %>% 
+  unite(spatial_period, spatial, period, remove = FALSE) %>% 
+  group_by(spatial_period, rating) %>% 
+  summarize(count = n()) %>% 
+  ungroup() %>% 
+  group_by(spatial_period) %>% 
+  mutate(total = sum(count),
+         percentage = count / total * 100) %>% 
+  ungroup()
+```
+
+```{r}
+ggplot(raw.rating.count, aes(spatial_period, percentage, fill = rating)) +
+  scale_fill_manual(values = c("fge" = "#56B4E9", "pvp" = "#E69F00")) +
+  geom_bar(stat = "identity") +
+  scale_y_continuous(expand = c(0, 0))
+```
+
+
+
+
+```{r}
+raw.rating.count <- sum.bibi.sub %>% 
+  unite(subspatial_period, subspatial, period, remove = FALSE) %>% 
+  group_by(bioregions, subspatial_period, subspatial, rating) %>% 
+  summarize(count = n()) %>% 
+  ungroup() %>% 
+  group_by(bioregions, subspatial_period, subspatial) %>% 
+  mutate(total = sum(count),
+         percentage = count / total * 100) %>% 
+  ungroup() %>% 
+  arrange(subspatial)
+```
+
+```{r, fig.width = 15, fig.height = 15}
+ggplot(raw.rating.count, aes(subspatial_period, percentage, fill = rating)) +
+  scale_fill_manual(values = c("fge" = "#56B4E9", "pvp" = "#E69F00")) +
+  geom_bar(stat = "identity") +
+  scale_y_continuous(expand = c(0, 0)) +
+  facet_wrap(~bioregions, ncol = 2, scales = "free")
+```

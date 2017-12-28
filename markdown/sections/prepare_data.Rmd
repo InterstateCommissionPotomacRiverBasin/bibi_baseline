@@ -1,0 +1,112 @@
+---
+title: "import"
+author: "Zachary M. Smith"
+date: "December 26, 2017"
+output: html_document
+---
+
+
+```{r}
+huc12.df <- data.table::fread(file.path(project.dir, "data/huc12/huc12.csv"),
+                             colClasses = c(huc_2 = "character",
+                                            huc_4 = "character",
+                                            huc_6 = "character",
+                                            huc_8 = "character",
+                                            huc_10 = "character",
+                                            huc_12 = "character"),
+                             na.strings = "0na") %>% 
+  select(huc_12, huc_8, acres, states) %>% 
+  filter(!huc_12 %in% c("020600010000", "020801010000", "020700111001")) %>% 
+  distinct() %>% 
+  mutate(total_acres = sum(acres))
+```
+
+Import the data obtained from CEDR in the [Data Acquisition] section.
+```{r}
+bibi.df <- data.table::fread(file.path(project.dir, "data/raw/scores_ratings.csv"),
+                             colClasses = c(huc_8 = "character",
+                                            huc_10 = "character",
+                                            huc_12 = "character"),
+                             na.strings = "0na")
+```
+
+```{r}
+bibi.df <- bibi.df %>% 
+  mutate(date = as.Date(date),
+         huc_12 = paste0("0", huc_12),
+         huc_8 = paste0("0", huc_8)) %>% 
+  unite(unique_id, event_id, sample_number, remove = FALSE)
+```
+
+```{r}
+bibi.df <- left_join(bibi.df, huc12.df, by = c("huc_12", "huc_8"))
+```
+
+
+Make subspatial a factor, so that it can be easily sorted in subsequent analyses.
+```{r}
+bibi.df <- bibi.df %>% 
+  mutate(subspatial = factor(subspatial, levels = c("inland", "coast",
+                                                    "blue", "ca", "lnp", "mac",
+                                                    "napu", "nca", "nrv", "pied",
+                                                    "sep", "sgv", "srv", "unp")),
+         category = if_else(category == "sev", "deg", category),
+         category = factor(category, levels = c("ref", "min", "mod", "deg", "mix")))
+```
+
+Count the number of sampling events per year and region/bioregion. The baseline year, 2008, is colored blue.
+```{r, fig.width = 8, fig.height = 10}
+bibi.df %>% 
+  mutate(year = year(date)) %>% 
+  group_by(year, subspatial) %>% 
+  summarize(count = n()) %>% 
+  ungroup() %>% 
+  mutate(baseline = if_else(year == 2008, TRUE, FALSE)) %>% 
+  arrange(subspatial) %>% 
+  ggplot(aes(year, count, fill = baseline)) +
+  scale_fill_manual(values = c("TRUE" = "#0072B2", "FALSE" = "#999999")) +
+  geom_bar(stat = "identity") +
+  guides(fill = FALSE) +
+  facet_wrap(~ subspatial, ncol = 2, scales = "free")
+```
+
+Create two new dataframes representing two potential time periods (i.e., 2000-2008 or 2004-2008) for establishing the 2008 baseline. The 2000-2008 time period was selected becuase there is a significant increase in the amount of sampling events in the 2000's relative to the 1990's. The 2004-2008 time period is centered around the 2006 National Land Cover Date (NLCD), which could be a useful factor in determining the baseline.
+```{r}
+bibi.0008 <- bibi.df %>% 
+  filter(date >= "2000-01-01",
+         date < "2009-01-01") %>% 
+  mutate(period = "2000_2008")
+
+bibi.0408 <- bibi.df %>% 
+  filter(date >= "2004-01-01",
+         date < "2009-01-01") %>% 
+  mutate(period = "2004_2008")
+
+bibi.0005  <- bibi.df %>% 
+  filter(date >= "2000-01-01",
+         date < "2006-01-01") %>% 
+  mutate(period = "2000_2005")
+
+bibi.0611 <- bibi.df %>% 
+  filter(date >= "2006-01-01",
+         date < "2011-01-01") %>% 
+  mutate(period = "2006_2011")
+
+```
+
+```{r}
+bibi.sub <- bind_rows(bibi.0008, bibi.0408, bibi.0005, bibi.0611)
+```
+
+```{r}
+bibi.sub <- bibi.sub %>% 
+  mutate(rating = if_else(rating %in% c("poor", "verypoor"), "poor", "attaining")) %>% 
+  group_by(period, subspatial, huc_12) %>% 
+  mutate(huc12_count = n()) %>% 
+  ungroup()
+```
+
+```{r}
+rm(bibi.0008, bibi.0408)
+```
+

@@ -1,0 +1,80 @@
+---
+title: "Region vs. Bioregion"
+author: "Zachary M. Smith"
+date: "December 26, 2017"
+output: html_document
+---
+
+
+```{r}
+sub.df <- bibi.df %>% 
+  group_by(spatial, category, station_id, agency_code) %>% 
+  mutate(count = n()) %>% 
+  ungroup() %>% 
+  filter(count >= 10) %>% 
+  unite(unique_id, station_id, spatial, remove = FALSE) %>% 
+  group_by(unique_id) %>% 
+  mutate(sd = sd(final_score)) %>% 
+  ungroup() %>% 
+  group_by(subspatial) %>% 
+  mutate(mean_sd = mean(sd),
+         median_sd = median(sd))
+```
+
+```{r, fig.width = 10, fig.height = 25}
+if (nrow(filter(sub.df, category == "ref")) > 0) {
+  sub.df %>% 
+  filter(category == "ref") %>% 
+  arrange(subspatial) %>% 
+ggplot(aes(date, final_score, group = unique_id, color = spatial)) + 
+  geom_line() +
+  scale_y_continuous(limits = c(0, 100)) +
+  facet_wrap(~unique_id + subspatial, ncol = 2)
+}
+```
+
+```{r, fig.width = 10, fig.height = 30}
+if (nrow(filter(sub.df, category == "min")) > 0) {
+  sub.df %>% 
+  filter(category == "mod") %>% 
+  arrange(subspatial) %>% 
+ggplot(aes(date, final_score, group = unique_id, color = spatial)) + 
+  geom_line() +
+  scale_y_continuous(limits = c(0, 100)) +
+  facet_wrap(~unique_id + subspatial, ncol = 2)
+}
+```
+
+```{r, fig.width = 10, fig.height = 30}
+if (nrow(filter(sub.df, category == "mod")) > 0) {
+  sub.df %>% 
+  filter(category == "mod") %>% 
+  arrange(subspatial) %>% 
+ggplot(aes(date, final_score, group = unique_id, color = spatial)) + 
+  geom_line() +
+  scale_y_continuous(limits = c(0, 100)) +
+  facet_wrap(~unique_id + subspatial, ncol = 2)
+}
+```
+
+```{r, fig.width = 10, fig.height = 2}
+if (nrow(filter(sub.df, category == "deg")) > 0) {
+  sub.df %>% 
+  filter(category == "deg") %>% 
+  arrange(subspatial) %>% 
+ggplot(aes(date, final_score, group = unique_id, color = spatial)) + 
+  geom_line() +
+  scale_y_continuous(limits = c(0, 100)) +
+  facet_wrap(~unique_id + subspatial, ncol = 2)
+}
+```
+
+```{r, fig.width = 10, fig.height = 5}
+sub.df %>% 
+  complete(category) %>% 
+ggplot(aes(subspatial, sd)) +
+  geom_boxplot() +
+  ylab("Standard Deviation") +
+  xlab("") +
+  facet_wrap(~category, ncol = 2)
+```

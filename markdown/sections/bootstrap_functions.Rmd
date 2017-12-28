@@ -1,0 +1,60 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "December 28, 2017"
+output: html_document
+---
+
+```{r}
+sample_ratings <- function(nest.df, reps, boot.sample) {
+  purrr::map(1:reps, function(i) {
+    bibi.sub <- nest.df %>% 
+      slice(sample(1:nrow(nest.df), boot.sample, replace = TRUE)) %>% 
+      mutate(sel_rating = if_else(is.na(sel_rating),
+                                  purrr::map_chr(data, function(i) {
+                                    unlist(i)[sample(1:length(unlist(i)), 1)]
+                                  }),
+                                  sel_rating)) %>% 
+      pull(sel_rating)
+  }) 
+}
+```
+
+```{r}
+pct_ratings <- function(ratings.list, boot.sample) {
+  purrr::map(1:length(ratings.list), function(list.i) {
+    data.frame(rating = unlist(ratings.list[list.i]), stringsAsFactors = FALSE) %>% 
+      mutate(rating = factor(rating, c("attaining", "poor", "insufficient"))) %>% 
+      group_by(rating) %>% 
+      summarize(pct = n() / boot.sample * 100) %>% 
+      ungroup() %>% 
+      complete(rating, fill =list(pct = 0)) %>% 
+      pull(pct)
+  })
+}
+```
+
+```{r}
+stat_ratings <- function(pct.ratings.list, boot.sample) {
+  purrr::map(1:3, function(i) {
+    purrr::map(pct.ratings.list, i) %>% 
+      unlist() %>% 
+      psych::describe()
+  }) %>% 
+    bind_rows() %>% 
+    mutate(rating = c("attaining", "poor", "insufficient"),
+           rating = factor(rating, c("attaining", "poor", "insufficient")),
+           bootstrap_sample = boot.sample) %>% 
+    select(rating, bootstrap_sample, everything(), -vars)
+}
+
+```
+
+```{r}
+bootstrap_ratings <- function(nest.df, reps, boot.sample) {
+ sample_ratings(nest.df, reps, boot.sample) %>% 
+    pct_ratings(boot.sample) %>% 
+    stat_ratings(boot.sample)
+}
+```
+

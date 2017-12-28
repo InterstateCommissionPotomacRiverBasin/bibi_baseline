@@ -1,0 +1,77 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "December 26, 2017"
+output: html_document
+---
+
+```{r}
+rate_index_5 <- function(x, score.col) {
+  score.col <- rlang::enquo(score.col)
+  x %>% 
+    mutate(rating = case_when(
+      (!!score.col )< half_ref_10 ~ "very_poor",
+      (!!score.col )>= half_ref_10 & (!!score.col )< ref_10 ~ "poor",
+      (!!score.col )>= ref_10 & (!!score.col )< ref_25 ~ "fair",
+      (!!score.col )>= ref_25 & (!!score.col )< ref_50 ~ "good",
+      (!!score.col )>= ref_50 ~ "excellent",
+      TRUE ~ "ERROR"
+    )) %>% 
+    pull(rating)
+}
+```
+
+```{r}
+rate_index_2 <- function(x, score.col) {
+  score.col <- rlang::enquo(score.col)
+  x %>% 
+    mutate(rating = case_when(
+      (!!score.col) < ref_10 ~ "pvp",
+      (!!score.col) >= ref_10  ~ "fge",
+      TRUE ~ "ERROR"
+    )) %>% 
+    pull(rating)
+}
+```
+
+```{r}
+bioregions <- bibi.sub %>% 
+  filter(spatial == "bioregion") %>% 
+  select(subspatial, unique_id) %>% 
+  rename(bioregions = subspatial) %>% 
+  distinct()
+```
+
+```{r}
+bibi.sub <- left_join(bibi.sub, bioregions, by = "unique_id") %>% 
+  unite(spatial_period, spatial, period, remove = FALSE)
+```
+
+```{r}
+rating.raw <- bibi.sub %>% 
+  group_by(period, spatial, subspatial, bioregions, huc_12,
+           half_ref_10, ref_10, ref_25, ref_50) %>% 
+  summarize(mean_score = mean(final_score)) %>% 
+  ungroup()
+```
+
+```{r}
+rating.huc12 <- bibi.sub %>% 
+  mutate(weighted_acres = acres / huc12_count,
+         rating = if_else(rating %in% c("very_poor", "poor"), "vpv", "fge")) %>% 
+  group_by(spatial_period,
+           rating, total_acres) %>% 
+  summarize(sum_acres = sum(weighted_acres)) %>% 
+  ungroup() %>%
+  mutate(percentage = sum_acres / total_acres * 100) %>% 
+  group_by(spatial_period) %>% 
+  mutate(rating = factor(rating, levels = c("fge", "vpv", "na"))) %>% 
+  complete(rating) %>% 
+  mutate(sum_pct = sum(percentage, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(percentage = if_else(rating == "na", 100 - sum_pct, percentage))
+  
+```
+
+
+

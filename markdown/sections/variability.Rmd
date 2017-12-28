@@ -1,0 +1,11 @@
+---
+title: "Variability"
+author: "Zachary M. Smith"
+date: "December 26, 2017"
+output: html_document
+---
+
+```{r}
+
+```
+
