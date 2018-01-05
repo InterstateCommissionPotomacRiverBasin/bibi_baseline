@@ -5,6 +5,10 @@ date: "December 27, 2017"
 output: html_document
 ---
 
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
+```
+
 ```{r, fig.width = 10, fig.height = 10}
 bibi.sub %>% 
   group_by(period, spatial, agency_code) %>% 

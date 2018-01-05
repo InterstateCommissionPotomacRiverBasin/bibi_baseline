@@ -5,6 +5,10 @@ date: "December 26, 2017"
 output: html_document
 ---
 
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
+```
+
 ```{r}
 
 ```

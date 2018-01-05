@@ -5,4 +5,8 @@ date: "December 26, 2017"
 output: html_document
 ---
 
-“Improve health and function of ten percent of stream miles above the 2008 baseline for the watershed” is a goal in the 2014 Chesapeake Bay Agreement. The Chesapeake Bay Program (CBP) selected the “Chessie BIBI,” a stream macroinvertebrate index of biotic integrity, as its biological indicator of stream health. It will use the index to evaluate and report progress improving stream communities across the Chesapeake watershed. A 2008 baseline for the Chessie BIBI still needs to be established. This AMAAB workshop reviews the recent BIBI index refinement by ICPRB and why CBP selected the BIBI as its stream health indicator. It presents results illustrating BIBI responses to nutrient enrichment, flow alteration, and land use, and lays out the technical challenges that will be faced in developing a 2008 baseline.  A second, smaller workshop to resolve these technical challenges will convene at Cacapon immediately following this 2018 AMAAB workshop.
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
+```
+
+“Improve health and function of ten percent of stream miles above the 2008 baseline for the watershed” is a goal in the 2014 Chesapeake Bay Agreement. The Chesapeake Bay Program (CBP) selected the “Chessie BIBI,” a stream macroinvertebrate index of biotic integrity, as its biological indicator of stream health. It will use the index to evaluate and report progress improving stream communities across the Chesapeake watershed. A 2008 baseline for the Chessie BIBI still needs to be established. __This document [describe what it is intended to provide]…__

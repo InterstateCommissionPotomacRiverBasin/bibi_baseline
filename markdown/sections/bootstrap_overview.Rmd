@@ -1,0 +1,35 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "December 29, 2017"
+output: html_document
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
+```
+
+## Overview
+
+Another potential method for summarizing Chessie BIBI ratings to establish a 2008 baseline invloves bootstraping samples from a grid (e.g., HUC 8, HUC 10, HUC 12, catchments, 1 x 1 km). Bootstrapping is random sampling with replacement that is repeated many times. The samples from each iteration can be summarized to determine the accuracy of the sampled measure.
+
+Samples in the Chessie BIBI database were not collected under a single sampling design, and therefore sampling densities are __not__ equal throughout the basin. To standardize the sampling density, Chessie BIBI samples can be aggregated by a grid represented by equal or approximately equal cells. The grid must cover the entire Chesapeake Bay basin. Each cell will represent a randomly selected sample located within the cell or be categorized as "insufficient" if there are no samples reported within the cell. The larger the cell size, the lower the impact of spatial densities; however, the larger the cell size, the lower the accuracy of the rating. Therefore, the cell size needs to be carefully selected, so that the
+the cell is large enough to reduce bias due to spatial density but small enough to accurately represent the area within the cell.
+
+HUC 12s could be used as a grid, as in section __ADD LINK__, with the added benefit of accuracy determined from bootstrap sampling. The bootstrap samples will approach the mean rating proportions summarized from the mean HUC 12 ratings. Therefore, as bootstrap sample size increases, the variability around the estimated mean rating proportion will decrease. To provide meaningful measures of standard deviation, the bootstrap sample size must have an equal probability of selecting a cell that contains at least one sampling event for all areas of the basin. A standard sampling size could be established from determining the agency with the lowest sampling density per that agencies sampling area. The lowest common denominator of sampling density could then be applied across the basin. For example, if agency X has the lowest sampling density and they collected samples with in 10 HUC 12s out of a total sampling area of 20 HUC 12s, then sampling half of all of the HUC 12s in the basin would provide a robust estimate of standard devidation of ratings in the Chesapeake Bay basin.
+the number of cells containing at least one sampling event for each agency that provided data within that agencies sampling area (e.g., state, county, city, or watershed). 
+
+
+The following objects are defined to standardize the input, and thus the output, of the bootstrap assessment at different spatail resolutions. 
+
+* `boot.reps` identifies how many iterations the bootstrap will calculate. 
+* `boot.samp.sizes` identifies the bootstrap sample size. If more than one sample size is provided as a vector, then the bootstrap will be performed for each sample size. 
+* `index.vec` identifies all of the indices (`spatial`) represented in `bibi.df`. This is neccessary to properly aggregate data during the bootstrap process. The order of the vector specified here will be used to sort the data in subsequent data frames and plots.
+* `periods.vec` identifies all of the sampling periods (`period`) represented in `bibi.df`. This is neccessary to properly aggregate data during the bootstrap process.  The order of the vector specified here will be used to sort the data in subsequent data frames and plots.
+```{r}
+boot.reps <- 30
+boot.samp.sizes <- c(100, 250, 500, 1000)
+spatial.vec <- c("region", "bioregion")
+periods.vec <- c("2000_2008", "2004_2008", "2006_2010", "2005_2011")
+```
+

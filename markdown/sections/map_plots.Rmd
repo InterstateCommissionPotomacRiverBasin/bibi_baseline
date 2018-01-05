@@ -1,0 +1,136 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "January 4, 2018"
+output: html_document
+
+---
+
+
+```{r}
+
+prep_poly <- function(poly.spdf, grid.col) {
+  names(poly.spdf) <- names(poly.spdf) %>% tolower()
+  
+  poly.spdf <- suppressWarnings(gBuffer(poly.spdf, byid = TRUE, width = 0))
+  
+  # DISSOLVE BASED ON "REGION" COLUMN USING rgeos::gUnionCascaded 
+  poly.spdf <- gUnionCascaded(poly.spdf, id = poly.spdf@data[, grid.col])
+  
+  # CREATE A DATAFRAME OF VALUES RETAINED FROM "REGION" COLUMN
+  sdf <- data.frame(ID = row.names(poly.spdf))
+  
+  # ASSIGN "REGION" VALUES TO rownames SO DATA MATCHES slots CORRECTLY
+  row.names(sdf) <- row.names(poly.spdf)
+  
+  # CREATE A SpatialPolygonsDataFrame OBJECT WITH A data slot HOLDING REGION IDS.  
+  poly.spdf <-  SpatialPolygonsDataFrame(poly.spdf, sdf) 
+  
+  return(poly.spdf)
+}
+
+```
+
+
+
+```{r}
+prep_grid <- function(grid.spdf, rating.df, period, grid.col) {
+  grid.col <- rlang::enquo(grid.col)
+  
+  rating.vec <- rating.df %>% 
+    filter(period == period) %>% 
+    select(!!grid.col) %>% 
+    distinct() %>% 
+    pull(!!grid.col)
+  
+  
+  final.df <- suppressMessages(fortify(grid.spdf)) %>% 
+    mutate(Samples = if_else(id %in% rating.vec, "Present", "Absent"),
+           Samples = factor(Samples, levels = c("Present", "Absent")))
+  
+  return(final.df)
+}
+```
+
+```{r, fig.width = 8, fig.height = 10}
+map_pres_grid <- function(poly.spdf, grid.col, rating.df, period,
+                          title = NULL, legend = FALSE, line.color = "black") {
+  grid.col <- rlang::enquo(grid.col)
+  
+  final.plot <- prep_poly(poly.spdf, dplyr::quo_name(grid.col)) %>% 
+    prep_grid(rating.df, period, !!grid.col) %>% 
+    ggplot(aes(long, lat, group = group, fill = Samples)) +
+    geom_polygon(color = line.color) +
+    scale_fill_manual(values = c("Absent" = "#999999", "Present" = "#0072B2")) +
+    coord_equal() +
+    theme_bw() +
+    theme(
+      axis.title.x=element_blank(),
+      axis.text.x=element_blank(),
+      axis.ticks.x=element_blank(),
+      axis.title.y=element_blank(),
+      axis.text.y=element_blank(),
+      axis.ticks.y=element_blank()
+    ) 
+  
+  if (!is.null(title)) {
+    final.plot <- final.plot +
+      ggtitle(title) +
+      theme(plot.title = element_text(hjust = 0.5))
+  }
+  
+  if (legend == FALSE) final.plot <- final.plot + theme(legend.position = "none")
+  
+  return(final.plot)
+}
+
+
+```
+
+```{r, fig.width = 10, fig.height = 3}
+
+plot_all_grids <- function(rating.df, period,
+                           bioregion.poly, huc6.poly,
+                           huc8.poly, huc10.poly,
+                           huc12.poly) {
+  
+  bioregion <- map_pres_grid(bioregion.poly, bioregion, rating.df, period, title = "Bioregion")
+  huc6 <- map_pres_grid(huc6.poly, huc6, rating.df, period, title = "HUC 6")
+  huc8 <- map_pres_grid(huc8.poly, huc8, rating.df, period, title = "HUC 8")
+  huc10 <- map_pres_grid(huc10.poly, huc10, rating.df, period, title = "HUC 10")
+  huc12 <- map_pres_grid(huc12.poly, huc12, rating.df, period, title = "HUC 12")
+  catchment <- map_pres_grid(catchment.poly, catchment, rating.df, period, title = "Catchment", line.color = NA)
+  
+  #gridExtra::grid.arrange(huc6, huc8, huc10, huc12, ncol = 4) 
+  grid.plot <- cowplot::plot_grid(bioregion, huc6,
+                                  huc8, huc10,
+                                  huc12, catchment,
+                                  ncol = 1, 
+                                  align = 'h'#,
+                                  #axis = 'l'
+                                  #rel_heights =  rep(1, 4),
+                                  #rel_widths =  c(rep(1, 3), 1.5)
+  )
+  
+  legend_b <- get_legend(map_pres_grid(huc6.poly, huc6,
+                                       rating.df, period, 
+                                       title = "HUC 6", legend = TRUE))
+  
+  cowplot::plot_grid(grid.plot, legend_b,
+                     ncol = 2,
+                     rel_widths = c(1, 0.1))
+}
+
+```
+
+
+```{r, fig.width = 10, fig.height = 30}
+system.time(
+test <- plot_all_grids(bibi.sub, "2004_2008", bioregion.poly, huc6.poly, huc8.poly, huc10.poly, huc12.poly)
+)
+```
+
+```{r, fig.width = 10, fig.height = 50}
+test
+```
+

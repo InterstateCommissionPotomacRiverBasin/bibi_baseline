@@ -5,126 +5,20 @@ date: "December 27, 2017"
 output: html_document
 ---
 
-```{r}
-library(rgdal)
-library(rgeos)
-library(maps)
-library(sp)
-```
-
-```{r}
-basin.poly <- readOGR(file.path(project.dir,"data/gis/bibi_shapefile/ICPRB_Bioregions.shp"))
-proj4string(basin.poly)
-#test <- subset(basin.poly, basin.poly$Basin != "Bay")
-basin.poly <- gUnaryUnion(basin.poly, id = basin.poly@data$Basin)
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
 ```
 
 
-```{r}
-huc12.poly <- readOGR(file.path(project.dir, "data/gis/huc12/ChesBay_WBD12_032015.shp"))
-proj4string(huc12.poly)
-```
 
-```{r}
-county.vec <- c("maryland_anne_arundel", "maryland_baltimore",
-                "maryland_frederick", "maryland_prince_georges",
-                "maryland_howard", "maryland_montgomery",
-                "virginia_loudoun", "virginia_fairfax")
+### Agency Sampling Area
 
-county.df <- map_data("county", c("Virginia", "Maryland")) %>% 
-  mutate(subregion = str_replace_all(subregion, " ", "_")) %>% 
-  unite(gregion, region, subregion, remove = FALSE) %>% 
-  filter(gregion %in% county.vec)
-```
-
-```{r}
-states.vec <- c('Maryland', "Virginia", "West Virginia",
-                "Delaware", "Pennsylvania", "New York",
-                "District of Columbia")
-
-state.df <- map_data('state', region = states.vec) %>% 
-  unite(gregion, region, subregion, remove = FALSE)
-```
-
-
-```{r}
-df <- county.df
-region <- rlang::quo(gregion)
-df_to_sp <- function(df, region) {
-  region <- rlang::enquo(region)
-  
-  region.vec <- df %>% 
-    select(!!region) %>% 
-    distinct() %>% 
-    pull((!!region))
-  
-  final.poly <- lapply(region.vec, function(region.i) {
-    df %>% 
-      filter(rlang::UQ(region) %in% region.i) %>% 
-      select(long, lat) %>% 
-      Polygon() %>% 
-      list() %>% 
-      Polygons(ID = region.i) %>% 
-      list()
-  }) %>% 
-    unlist() %>% 
-    SpatialPolygons()
-  return(final.poly)
-}
-```
-
-```{r}
-poly_to_spdf <- function(spoly){
-  region.vec <- unique(names(spoly))
-  
-  proj4string(spoly) <- CRS("+init=epsg:4269")
-  CRS.new <- CRS("+proj=utm +zone=18 +datum=NAD83 +units=m +no_defs +ellps=GRS80 +towgs84=0,0,0")
-  final.spdf <- spTransform(spoly, CRS.new)  %>% 
-    SpatialPolygonsDataFrame(data.frame(id = region.vec,
-                                                     row.names = region.vec))
-  return(final.spdf)
-}
-```
-
-```{r}
-prep_spdf <- function(df, region) {
-  region <- rlang::enquo(region)
-  
-  final.spdf <- df_to_sp(df, !!region) %>% 
-    poly_to_spdf()
-  
-  return(final.spdf)
-}
-```
-
-```{r}
-state.spdf <- prep_spdf(state.df, gregion)
-county.spdf <- prep_spdf(county.df, gregion)
-```
-
-
-```{r}
-basin.poly <- gBuffer(basin.poly, width = 0, byid = TRUE) 
-state.spdf <- gBuffer(state.spdf, width = 0, byid = TRUE) 
-county.spdf <- gBuffer(county.spdf, width = 0, byid = TRUE) 
-```
-
-```{r}
-state.clip <- gIntersection(state.spdf, basin.poly, byid = TRUE) %>% 
-  SpatialPolygonsDataFrame(data.frame(id = names(.), 
-                                           row.names = names(.)))
-  
-```
 
 ```{r, message=FALSE, fig.width = 8, fig.height = 10}
 ggplot() +
-  geom_polygon(data = fortify(spTransform(state.clip, CRS("+init=epsg:4269"))),
+  geom_polygon(data = fortify(state.clip),
                aes(long, lat, group = group),
                color = "black", fill = "#999999") +
-  geom_polygon(data = fortify(spTransform(basin.poly, CRS("+init=epsg:4269"))),
-               aes(long, lat, group = group),
-               color = "black", fill = "#999999", alpha = 0) +
-  #annotation_map(fortify(clip2), fill = "#999999", colour = "black") +
   geom_point(data = bibi.sub[bibi.sub$period == "2000_2008", ],
              aes(longitude, latitude), color = "#0072B2") +
   coord_equal() +
@@ -140,42 +34,88 @@ ggplot() +
 ```
 
 
-```{r}
-calc_area <- function(spdf) {
-  lapply(unique(spdf$id), function(i) {
-  final.df <- data.frame(id = i, stringsAsFactors = FALSE)
-  final.df$area <- gArea(spdf[spdf$id == i, ])
-  final.df
-}) %>% 
-  bind_rows()
-}
-```
+
+
+### State Program Sampling Frequency
+
 
 ```{r}
-county.area <- calc_area(county.spdf)
-```
-
-```{r}
-state.area <- calc_area(state.clip) %>% 
-   mutate(state = case_when(
-    str_detect(id, "district") ~ "district of columbia",
-    str_detect(id, "delaware") ~ "delaware",
-    str_detect(id, "maryland") ~ "maryland",
-    str_detect(id, "virginia") ~ "virginia",
-    str_detect(id, "west virginia") ~ "west virginia",
-    str_detect(id, "pennsylvania") ~ "pennsylvania",
-    str_detect(id, "new york") ~ "new york",
-    TRUE ~ "ERROR"
-  )) %>% 
-  group_by(state) %>% 
-  summarize(area = sum(area))
+bibi.state <- bibi.sub %>% 
+  mutate(state_program = case_when(
+    str_detect(agency_code, "dnrec") ~ "DNREC",
+    str_detect(agency_code, "mddnr") ~ "MDDNR",
+    str_detect(agency_code, "nydec") ~ "NYDEC",
+    str_detect(agency_code, "padep") ~ "PADEP",
+    str_detect(agency_code, "vadeq") ~ "VADEQ",
+    str_detect(agency_code, "wvdep") ~ "WVDEP",
+    str_detect(agency_code, "ddoe") ~ "DDOE",
+    TRUE ~ "remove"
+  ),
+  state_program = factor(state_program,
+                         levels = c("DDOE", "DNREC", "NYDEC", 
+                                    "PADEP", "WVDEP", "VADEQ", "MDDNR")),
+  year = year(date)) %>% 
+  filter(!state_program == "remove",
+         year >= 2000,
+         year <= 2011,
+         latitude > 0) %>% 
+  complete(state_program, year)
 ```
 
 
-```{r}
+```{r, warning=FALSE, fig.width = 8, fig.height = 20}
+ggplot() +
+  geom_polygon(data = suppressMessages(fortify(state.clip)),
+               aes(long, lat, group = group),
+               color = "black", fill = "#999999") +
+  geom_point(data = bibi.state,
+             aes(longitude, latitude, color = state_program), size = 1.5) +
+  scale_color_manual(values = c(
+    "DNREC" = "#E69F00",
+    "MDDNR" = "#56B4E9",
+    "NYDEC" = "#009E73",
+    "PADEP" = "#F0E442",
+    "VADEQ" = "#0072B2",
+    "WVDEP" = "#D55E00",
+    "DDOE" = "#CC79A7")) +
+  coord_equal() +
+  theme_bw() +
+  theme(
+        axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()) +
+    #labs(title = state.program) +
+  facet_wrap(~year, ncol = 2)
 
+```
+
+
+
+
+
+```{r}
+huc12.poly <- gbuf(huc12.poly)
 # DISSOLVE BASED ON "REGION" COLUMN USING rgeos::gUnionCascaded 
-huc12.poly <- gUnionCascaded(huc12.poly, id = huc12.poly@data$HUC12)
+basin.poly2 <- gUnionCascaded(basin.poly, id = basin.poly@data$OBJECTID)
+```
+
+
+
+
+
+```{r}
+
+huc12.poly2 <- gBuffer(head(huc12.poly, 20), byid = TRUE, width = 0)
+test2 <- subset(huc12.poly, HUC12 %in% head(unique(huc12.poly@data$HUC12)))
+plot(test2)
+
+huc12.poly@data$ID <- huc12.poly@data$HUC12
+test <- fortify(huc12.poly)
+# DISSOLVE BASED ON "REGION" COLUMN USING rgeos::gUnionCascaded 
+huc12.poly2 <- rgeos::gUnionCascaded(head(huc12.poly), id = head(huc12.poly@data$HUC12))
 
 
 # CREATE A DATAFRAME OF VALUES RETAINED FROM "REGION" COLUMN
@@ -185,9 +125,9 @@ sdf <- data.frame(ID = row.names(huc12.poly))
 row.names(sdf) <- row.names(huc12.poly)
 
 # CREATE A SpatialPolygonsDataFrame OBJECT WITH A data slot HOLDING REGION IDS.  
-huc12.poly <-  SpatialPolygonsDataFrame(huc12.poly, sdf) 
+huc12.poly2 <-  SpatialPolygonsDataFrame(huc12.poly, huc12.poly@data$HUC12) 
 
-huc12.poly <- subset(huc12.poly, !ID %in% c("020600010000", "020801010000", "020700111001"))
+#huc12.poly <- subset(huc12.poly, !ID %in% c("020600010000", "020801010000", "020700111001"))
 ```
 
 ```{r}
@@ -219,11 +159,20 @@ proj4string(bibi.0408.gis) <- CRS("+proj=utm +zone=18 +datum=NAD83 +units=m +no_
 ```
 
 ```{r}
+huc12.0408 <- huc12.poly@data$Samples[if_else(huc12.poly@data$HUC12 %in% unique(bibi.0408$huc_12), "Present", "Absent")]
+```
+
+```{r}
 huc12.0408 <- fortify(huc12.poly) %>% 
   mutate(Samples = if_else(id %in% unique(bibi.0408$huc_12), "Present", "Absent"))
 
 huc12.0008 <- fortify(huc12.poly) %>% 
   mutate(Samples = if_else(id %in% unique(bibi.0008$huc_12), "Present", "Absent"))
+
+huc12.fort <- fortify(huc12.poly) %>% 
+  mutate(`2004_2008` = if_else(id %in% unique(bibi.0408$huc_12), "Present", "Absent"),
+         `2000_2008` = if_else(id %in% unique(bibi.0008$huc_12), "Present", "Absent")) %>% 
+  gather(period, Samples, `2004_2008`:`2000_2008`)
 ```
 
 

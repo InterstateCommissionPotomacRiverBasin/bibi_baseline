@@ -5,20 +5,8 @@ date: "December 26, 2017"
 output: html_document
 ---
 
-
-```{r}
-huc12.df <- data.table::fread(file.path(project.dir, "data/huc12/huc12.csv"),
-                             colClasses = c(huc_2 = "character",
-                                            huc_4 = "character",
-                                            huc_6 = "character",
-                                            huc_8 = "character",
-                                            huc_10 = "character",
-                                            huc_12 = "character"),
-                             na.strings = "0na") %>% 
-  select(huc_12, huc_8, acres, states) %>% 
-  filter(!huc_12 %in% c("020600010000", "020801010000", "020700111001")) %>% 
-  distinct() %>% 
-  mutate(total_acres = sum(acres))
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me, cache.path=cache.dir)
 ```
 
 Import the data obtained from CEDR in the [Data Acquisition] section.
@@ -30,20 +18,30 @@ bibi.df <- data.table::fread(file.path(project.dir, "data/raw/scores_ratings.csv
                              na.strings = "0na")
 ```
 
+Convert the date from a character class to a date class. 
 ```{r}
 bibi.df <- bibi.df %>% 
-  mutate(date = as.Date(date),
-         huc_12 = paste0("0", huc_12),
-         huc_8 = paste0("0", huc_8)) %>% 
+  mutate(date = as.Date(date))
+```
+
+Rename HUC columns so that they are consistant with names from the NHDPlus data set. A leading zero to all HUC columns.
+```{r}
+bibi.df <- bibi.df %>% 
+  rename(huc12 = huc_12,
+         huc10 = huc_10,
+         huc8 = huc_8) %>% 
+  mutate(huc12 = paste0("0", huc12),
+         huc10 = paste0("0", huc10),
+         huc8 = paste0("0", huc8))
+```
+
+Chesapeake Bay Program creates a unique sampling event ID (`event_id`) for each reported sampling event. However, the event does not distinquish between replicates (`sample_number`) collected during the same sampling event. To make it easier to seperate replicates, a unique ID (`unique_id`) is created by concatenating the sampling event ID (`event_id`) with the replicate number (`sample_number`).
+```{r}
+bibi.df <- bibi.df %>% 
   unite(unique_id, event_id, sample_number, remove = FALSE)
 ```
 
-```{r}
-bibi.df <- left_join(bibi.df, huc12.df, by = c("huc_12", "huc_8"))
-```
-
-
-Make subspatial a factor, so that it can be easily sorted in subsequent analyses.
+Convert the region and bioregion classifications (`subspatial`) from class character to class factor. Additionally, change the disturbance gradient classifications (`category`) from class character to class factor. Factors can be assigned `levels` which makes it easier to specify and apply a custom order. The factors will be most helpful when plotting.
 ```{r}
 bibi.df <- bibi.df %>% 
   mutate(subspatial = factor(subspatial, levels = c("inland", "coast",
@@ -54,10 +52,126 @@ bibi.df <- bibi.df %>%
          category = factor(category, levels = c("ref", "min", "mod", "deg", "mix")))
 ```
 
-Count the number of sampling events per year and region/bioregion. The baseline year, 2008, is colored blue.
-```{r, fig.width = 8, fig.height = 10}
-bibi.df %>% 
+### HUCs
+Import Hydrologic Unit Codes (HUC) for all of the HUCs represented within the Chesapeake Bay basin. Retain only the necessary columns. Columns `acres` and `states` reflect HUC 12 area ($$acres^2$$) and the state(s) which fall within the HUC 12, respectively. HUC 12's "020600010000", "020801010000", and "020700111001" represent different portions of the Chesapeake Bay and are removed from the data frame. The area in $$acres^2$$ of the basin (`total_accres`) is found by summing all of the HUC 12 `acres`.
+```{r}
+huc12.df <- data.table::fread(file.path(project.dir, "data/grid_info/huc12.csv"),
+                             colClasses = c(huc_2 = "character",
+                                            huc_4 = "character",
+                                            huc_6 = "character",
+                                            huc_8 = "character",
+                                            huc_10 = "character",
+                                            huc_12 = "character"),
+                             na.strings = "0na") %>% 
+  select(huc_12, huc_10, huc_8, huc_6, acres, states) %>% 
+  rename(huc12 = huc_12,
+         huc10 = huc_10,
+         huc8 = huc_8,
+         huc6 = huc_6) %>% 
+  mutate(huc12 = paste0("0", huc12),
+         huc10 = paste0("0", huc10),
+         huc8 = paste0("0", huc8),
+         huc6 = paste0("0", huc6)
+         ) %>% 
+  filter(!huc12 %in% c("020600010000", "020801010000", "020700111001"),
+         !huc6 %in% "020402") %>% 
+  distinct() %>% 
+  mutate(total_acres = sum(acres))
+```
+
+Join the rating data (`bibi.df`) with the HUC 12 data (`huc12.df`) to obtain the square acres each HUC 12 represents (`acres`) and the states that the HUC 12 falls within (`states`).
+```{r}
+bibi.df <- left_join(bibi.df, huc12.df, by = c("huc8", "huc10", "huc12"))
+```
+
+#### Catchment
+
+```{r}
+pts_in_poly <- function(points.df, polygon, poly.col) {
+  crs <- proj4string(polygon)
+
+  coordinates(points.df) <- ~ longitude + latitude
+  proj4string(points.df) <- CRS("+init=epsg:4269")
+  crs.new <- CRS(crs)
+  points.df <- spTransform(points.df, crs.new)
+  over.vec <- sp::over(points.df, polygon)[, poly.col]
+  points.df <- data.frame(points.df, stringsAsFactors = FALSE)
+  points.df[, poly.col] <- as.integer(over.vec)
+ 
+ return(points.df)
+}
+```
+
+```{r}
+catchment.poly <- readOGR(file.path(project.dir, "data/gis/NHDPlus/shapefiles/catchment.shp"),
+                      verbose = FALSE)
+```
+
+```{r}
+bibi.df <- pts_in_poly(bibi.df, catchment.poly, "catchment")
+```
+
+```{r}
+rm(catchment.poly)
+```
+
+
+#### Bioregions
+
+Subset the BIBI data frame (`bibi.df`) to only represent unique bioregions (`spatial == "bioregion"`) and unique sampling event IDs (`unique_id`). 
+```{r}
+bioregions.df <- bibi.df %>% 
+  filter(spatial == "bioregion") %>% 
+  select(subspatial, unique_id) %>% 
+  rename(bioregion = subspatial) %>% 
+  distinct()
+```
+
+Join the new bioregions data frame (`bioregions.df`) to the BIBI data frame (`bibi.df`) by the unique sampling event IDs (`unique_id`). This will allow data aggregated at the regional level (`spatial == "region"`) to be aggregated at the bioregion level.
+```{r}
+bibi.df <- left_join(bibi.df, bioregions.df, by = "unique_id") %>% 
+  select(spatial, subspatial, bioregion, everything())
+```
+
+## Count Samples Per Year
+
+This section provides visuals of sample counts per year, which are helpful in defining potential baseline periods.
+
+In subsquent sections the data will be summarized so that each station has one representive sample per the defined baseline sampling period. To count just the potential number of sampling stations (`station_id`), `dplyr::select()` is used to subset the columns to only represent sampling date (`date`), sample aggregation factor(`subspatial`), and station ID (`station_id`). `dplyr::distinct()` is used to remove any duplicate rows. The `bibi.count` data frame will be used to generate the subsequent plots in this section.
+```{r}
+bibi.count <- bibi.df %>% 
+  select(date, subspatial, station_id) %>% 
+  distinct()
+```
+
+
+### Basin
+
+Count the number of sampling events per year. The baseline year, 2008, is colored blue.
+```{r, fig.width = 8, fig.height = 2}
+bibi.count %>% 
   mutate(year = year(date)) %>% 
+  select(year, station_id) %>% 
+  distinct() %>% 
+  group_by(year) %>% 
+  summarize(count = n()) %>% 
+  ungroup() %>% 
+  mutate(baseline = if_else(year == 2008, TRUE, FALSE)) %>% 
+  ggplot(aes(year, count, fill = baseline)) +
+  scale_fill_manual(values = c("TRUE" = "#0072B2", "FALSE" = "#999999")) +
+  geom_bar(stat = "identity") +
+  guides(fill = FALSE)
+```
+
+### Region
+
+Split the count the number of sampling events per year by region. The baseline year, 2008, is colored blue.
+```{r, fig.width = 8, fig.height = 2}
+bibi.count %>% 
+  filter(subspatial %in% c("inland", "coast")) %>% 
+  mutate(year = year(date)) %>% 
+  select(-date) %>% 
+  distinct() %>% 
   group_by(year, subspatial) %>% 
   summarize(count = n()) %>% 
   ungroup() %>% 
@@ -67,46 +181,78 @@ bibi.df %>%
   scale_fill_manual(values = c("TRUE" = "#0072B2", "FALSE" = "#999999")) +
   geom_bar(stat = "identity") +
   guides(fill = FALSE) +
-  facet_wrap(~ subspatial, ncol = 2, scales = "free")
+  facet_wrap(~ subspatial, ncol = 2)
 ```
 
-Create two new dataframes representing two potential time periods (i.e., 2000-2008 or 2004-2008) for establishing the 2008 baseline. The 2000-2008 time period was selected becuase there is a significant increase in the amount of sampling events in the 2000's relative to the 1990's. The 2004-2008 time period is centered around the 2006 National Land Cover Date (NLCD), which could be a useful factor in determining the baseline.
+### Bioregion
+
+Split the count the number of sampling events per year by bioregion. The baseline year, 2008, is colored blue.
+```{r, fig.width = 8, fig.height = 8}
+bibi.count %>% 
+  filter(!subspatial %in% c("inland", "coast")) %>% 
+  mutate(year = year(date)) %>% 
+  select(-date) %>% 
+  distinct() %>% 
+  group_by(year, subspatial) %>% 
+  summarize(count = n()) %>% 
+  ungroup() %>% 
+  mutate(baseline = if_else(year == 2008, TRUE, FALSE)) %>% 
+  arrange(subspatial) %>% 
+  ggplot(aes(year, count, fill = baseline)) +
+  scale_fill_manual(values = c("TRUE" = "#0072B2", "FALSE" = "#999999")) +
+  geom_bar(stat = "identity") +
+  guides(fill = FALSE) +
+  facet_wrap(~ subspatial, ncol = 2)
+```
+
+## Create Baseline Periods
+
+Create a list of data frames representing two potential time periods (i.e., 2000-2008 or 2004-2008) for establishing the 2008 baseline. The 2000-2008 time period was selected becuase there is a significant increase in the amount of sampling events in the 2000's relative to the 1990's. The 2004-2008 time period is centered around the 2006 National Land Cover Date (NLCD) and was used by Maloney et al. (publication pending).
 ```{r}
-bibi.0008 <- bibi.df %>% 
+bibi.list <- list()
+
+bibi.list$bibi.0008 <- bibi.df %>% 
   filter(date >= "2000-01-01",
          date < "2009-01-01") %>% 
   mutate(period = "2000_2008")
 
-bibi.0408 <- bibi.df %>% 
+bibi.list$bibi.0408 <- bibi.df %>% 
   filter(date >= "2004-01-01",
          date < "2009-01-01") %>% 
   mutate(period = "2004_2008")
 
-bibi.0005  <- bibi.df %>% 
-  filter(date >= "2000-01-01",
-         date < "2006-01-01") %>% 
-  mutate(period = "2000_2005")
-
-bibi.0611 <- bibi.df %>% 
+bibi.list$bibi.0610  <- bibi.df %>% 
   filter(date >= "2006-01-01",
          date < "2011-01-01") %>% 
-  mutate(period = "2006_2011")
+  mutate(period = "2006_2010")
+
+bibi.list$bibi.0611 <- bibi.df %>% 
+  filter(date >= "2005-01-01",
+         date < "2012-01-01") %>% 
+  mutate(period = "2005_2011")
 
 ```
 
+Join the list of data frames into a single data frame.
 ```{r}
-bibi.sub <- bind_rows(bibi.0008, bibi.0408, bibi.0005, bibi.0611)
+bibi.sub <- bind_rows(bibi.list)
 ```
 
+## Aggregate Ratings
+
+The Chessie BIBI has five rating categores (i.e., Excellent, Good, Fair, Poor, and Very Poor). However, the Chesapeake Bay Program is only interested in the percentage of Excellent and Good versus Poor and Very Poor. The ratings are reclassified to reflect the Chesapeake Bay Programs needs. "Poor" is used to represent the combination of Poor and Very Poor, while "Attaining" is used to represent Excellent and Good. The Fair category will be used as a gray-zone between the two categories of interest. 
 ```{r}
 bibi.sub <- bibi.sub %>% 
-  mutate(rating = if_else(rating %in% c("poor", "verypoor"), "poor", "attaining")) %>% 
-  group_by(period, subspatial, huc_12) %>% 
-  mutate(huc12_count = n()) %>% 
-  ungroup()
+  mutate(rating = case_when(
+    rating %in% c("excellent", "good") ~ "attaining",
+    rating %in% c("fair") ~ "fair",
+    rating %in% c("poor", "verypoor") ~ "poor",
+    TRUE ~ "ERROR"
+    ))
 ```
 
+Remove unnecessary items from the global environment.
 ```{r}
-rm(bibi.0008, bibi.0408)
+rm(bibi.list, bibi.count, bioregions.df)
 ```
 

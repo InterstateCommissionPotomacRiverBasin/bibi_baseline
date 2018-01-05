@@ -3,7 +3,6 @@ title: "R Notebook"
 output: html_document
 ---
 
-
 ```{r echo=FALSE}
 knitr::opts_chunk$set(eval=run.cedr.acquisition)
 ```
@@ -76,6 +75,7 @@ dir.create(file.path(rprojroot::find_rstudio_root_file(), "data/raw"),
 data.table::fwrite(bibi.df, file.path(rprojroot::find_rstudio_root_file(), "data/raw", "scores_ratings.csv"))
 ```
 
+Remove objects from the global envirnment which are no longer useful.
 ```{r}
 rm(huc12.df, file.dir, bioregion.df, region.df, bibi.df)
 ```

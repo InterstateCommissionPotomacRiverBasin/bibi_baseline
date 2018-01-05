@@ -1,0 +1,44 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "December 28, 2017"
+output: html_document
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
+```
+
+The HUC 12 data frame (`huc12.df`) is subset to only represent unique HUC 8 values. This data frame contains all of the HUC 8s found in the Chesapeake Bay basin.
+```{r}
+huc8.df <- huc12.df %>% 
+  select(huc8) %>% 
+  distinct()
+```
+
+Nest the data frame by sampling period (`period`), spatial resolution (`spatial`), and HUC 8 (`huc8`) in preparation of performing the bootstrap analyses (see [Nested Data Frame]).
+```{r}
+bibi.nest.huc8 <- nest_df(bibi.sub, huc8.df, huc8) 
+```
+
+Perform the bootstrap analyses for each sampling period (`period`), spatial resolution (`spatial`), and HUC 8 (`huc8`) (see [Multiple Bootstrap Ratings]).
+```{r}
+boot.huc8 <- multi_bootstrap_ratings(bibi.nest.huc8, boot.reps, boot.samp.sizes,
+                                     spatial.vec, periods.vec)
+```
+
+Generate bar plots with standard deviation bars for each rating category by sampling period (`period`) and spatial resolution (`spatial`) (see [Bootstrap Bar Plots]).
+```{r, fig.width = 8, fig.height = 7}
+plot_boot_bar(boot.huc8, periods.vec, title = "HUC 8")
+```
+
+Generate line plots of standard deviation bars for each rating category by bootstrap sampling size (see [Bootstrap Standard Deviation Plots]). Each plot represents a unique sampling period (`period`) and spatial resolution (`spatial`).
+```{r, fig.width = 8, fig.height = 7}
+plot_boot_sd(boot.huc8, periods.vec, title = "HUC 8")
+```
+
+Generate area plots of the proportion of each rating after excluding samples classified as insufficient (see [Bootstrap Area Plots]). Each plot represents a unique sampling period (`period`) and spatial resolution (`spatial`).
+```{r, fig.width = 15, fig.height = 7}
+exclude_insufficient(boot.huc8) %>% 
+rating_area_plot("HUC 8")
+```

@@ -1,0 +1,46 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "January 3, 2018"
+output: html_document
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
+```
+
+A data frame containing all of the catchments found in the Chesapeake Bay basin is imported.
+```{r}
+catchments.df <- data.table::fread(file.path(project.dir, "data/grid_info/catchments.csv"),
+                                   na.strings = "0na") %>% 
+  clean_up() %>% 
+  select(catchment)
+```
+
+Nest the data frame by sampling period (`period`), spatial resolution (`spatial`), and catchment (`catchment`) in preparation of performing the bootstrap analyses (see [Nested Data Frame]).
+```{r}
+bibi.nest.catchment <- nest_df(bibi.sub, catchments.df, catchment) 
+```
+
+Perform the bootstrap analyses for each sampling period (`period`), spatial resolution (`spatial`), and catchment (`catchment`) (see [Multiple Bootstrap Ratings]).
+```{r}
+boot.catchment <- multi_bootstrap_ratings(bibi.nest.catchment, boot.reps, boot.samp.sizes,
+                                          spatial.vec, periods.vec)
+```
+
+Generate bar plots with standard deviation bars for each rating category by sampling period (`period`) and spatial resolution (`spatial`) (see [Bootstrap Bar Plots]).
+```{r, fig.width = 8, fig.height = 7}
+plot_boot_bar(boot.catchment, periods.vec, title = "Catchment")
+```
+
+Generate line plots of standard deviation bars for each rating category by bootstrap sampling size (see [Bootstrap Standard Deviation Plots]). Each plot represents a unique sampling period (`period`) and spatial resolution (`spatial`).
+```{r, fig.width = 8, fig.height = 7}
+plot_boot_sd(boot.catchment, periods.vec, title = "Catchment")
+```
+
+Generate area plots of the proportion of each rating after excluding samples classified as insufficient (see [Bootstrap Area Plots]). Each plot represents a unique sampling period (`period`) and spatial resolution (`spatial`).
+```{r, fig.width = 15, fig.height = 7}
+exclude_insufficient(boot.catchment) %>% 
+rating_area_plot("Catchment")
+```
+

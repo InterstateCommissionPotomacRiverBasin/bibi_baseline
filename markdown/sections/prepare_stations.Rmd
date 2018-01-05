@@ -1,0 +1,40 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "January 3, 2018"
+output: html_document
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
+```
+
+Some of the stations in the data set have replicates for the same sampling event and/or have multiple samples collected at the same station on different dates. In subsequent sections the data will be aggregated by grid cells from various grids (i.e., bioregion, HUC 6, HUC 8, HUC 10, HUC 12, and catchments). Stations
+
+
+```{r}
+station_median_score <- function(x) {
+  x %>% 
+    group_by(spatial, subspatial, station_id, agency_code,
+             date,
+             half_ref_10, ref_10, ref_25, ref_50) %>% 
+    summarize(final_score = median(final_score)) %>% 
+    ungroup() %>% 
+    group_by(spatial, subspatial, station_id, agency_code,
+             half_ref_10, ref_10, ref_25, ref_50) %>% 
+    summarize(final_score = median(final_score)) %>% 
+    ungroup()
+}
+```
+
+
+```{r}
+station_sel_one <- function(x, samp_size = 1, set_seed = TRUE, seed = 1) {
+  if (set_seed == TRUE) set.seed(seed)
+  
+  x %>% 
+    group_by(station_id, agency_code) %>% 
+    sample_n(samp_size)
+}
+```
+

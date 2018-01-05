@@ -1,0 +1,59 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "December 27, 2017"
+output: html_document
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
+```
+
+## Import Shapefiles
+
+Import shapefiles as spatial polygon data frames for visualizing different grids that could be used during the analysis.
+```{r}
+basin.poly <- readOGR(file.path(project.dir, "data/gis/NHDPlus/shapefiles/basin.shp"),
+                      verbose = FALSE)
+
+bioregion.poly <- readOGR(file.path(project.dir, "data/gis/NHDPlus/shapefiles/bioregion.shp"),
+                      verbose = FALSE) 
+
+huc6.poly <- readOGR(file.path(project.dir, "data/gis/NHDPlus/shapefiles/huc6.shp"),
+                      verbose = FALSE)
+
+huc8.poly <- readOGR(file.path(project.dir, "data/gis/NHDPlus/shapefiles/huc8.shp"),
+                      verbose = FALSE)
+
+huc10.poly <- readOGR(file.path(project.dir, "data/gis/NHDPlus/shapefiles/huc10.shp"),
+                      verbose = FALSE)
+
+huc12.poly <- readOGR(file.path(project.dir, "data/gis/NHDPlus/shapefiles/huc12.shp"),
+                      verbose = FALSE)
+
+catchment.poly <- readOGR(file.path(project.dir, "data/gis/NHDPlus/shapefiles/catchment.shp"),
+                      verbose = FALSE)
+```
+
+State polygons can be imported using the function `mapps::map_data()`. `dplyr::unite()` is used to concatenate the `region` and `subregion` columns into a grouped region column (`gregion`). The grouped region column (`greion`) is necessary to maintain polygon integrity because without this column the polygons will often be distorted when plotting.
+```{r}
+states.vec <- c('Maryland', "Virginia", "West Virginia",
+                "Delaware", "Pennsylvania", "New York",
+                "District of Columbia")
+
+state.df <- map_data('state', region = states.vec) %>% 
+  unite(gregion, region, subregion, remove = FALSE)
+```
+
+Convert the state data frame (`state.df`) to a spatial polygon data frame using `prep_spdf()` (see [Map Functions]), so that it can be clipped by other polygons in subsequent code chunks.
+```{r}
+state.spdf <- prep_spdf(state.df, gregion)
+```
+
+Clip, using `rgeos::gIntersection()`, the state polygons (`state.spdf`), so they are only represented as areas that fall within the Chesapeake Bay basin (`basin.poly`). Use `sp::SpatialPolygonsDataFrame()` to convert the intersected polygons to spatial polygon data frames.
+```{r}
+state.clip <- gIntersection(state.spdf, basin.poly, byid = TRUE) %>% 
+  SpatialPolygonsDataFrame(data.frame(id = names(.), 
+                                           row.names = names(.)))
+```
+

@@ -5,6 +5,10 @@ date: "December 26, 2017"
 output: html_document
 ---
 
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
+```
+
 ```{r}
 rate_index_5 <- function(x, score.col) {
   score.col <- rlang::enquo(score.col)
@@ -20,6 +24,7 @@ rate_index_5 <- function(x, score.col) {
     pull(rating)
 }
 ```
+
 
 ```{r}
 rate_index_2 <- function(x, score.col) {
@@ -47,30 +52,116 @@ bibi.sub <- left_join(bibi.sub, bioregions, by = "unique_id") %>%
   unite(spatial_period, spatial, period, remove = FALSE)
 ```
 
+
 ```{r}
 rating.raw <- bibi.sub %>% 
-  group_by(period, spatial, subspatial, bioregions, huc_12,
-           half_ref_10, ref_10, ref_25, ref_50) %>% 
-  summarize(mean_score = mean(final_score)) %>% 
-  ungroup()
+  group_by(spatial_period) %>% 
+  mutate(total = n()) %>% 
+  ungroup() %>% 
+  group_by(spatial_period, rating, total) %>% 
+  summarize(count = n()) %>% 
+  ungroup() %>% 
+  mutate(percentage = count / total * 100) %>% 
+  select(spatial_period, rating, percentage)
+  
 ```
+
+```{r, fig.width=8, fig.height=5}
+rating.raw %>% 
+  ggplot(aes(spatial_period, percentage, fill = rating)) +
+  geom_bar( position = "dodge", stat = "identity") +
+  scale_fill_manual(values = c("attaining" = "#56B4E9",
+                               "poor" = "#E69F00",
+                               "insufficient" = "#999999")) +
+  xlab("Period") +
+  ylab("Mean Percentage") +
+  ggtitle("Raw")  +
+  theme(plot.title = element_text(hjust = 0.5)) +#,
+        #axis.text.x  = element_text(angle = 330, vjust = 1, hjust = 0))
+  coord_flip()
+```
+
+
+
+
+
 
 ```{r}
 rating.huc12 <- bibi.sub %>% 
-  mutate(weighted_acres = acres / huc12_count,
-         rating = if_else(rating %in% c("very_poor", "poor"), "vpv", "fge")) %>% 
+  group_by(period, subspatial, huc_12) %>% 
+  mutate(huc12_count = n()) %>% 
+  ungroup() %>%  
+  mutate(weighted_acres = acres / huc12_count) %>% 
   group_by(spatial_period,
            rating, total_acres) %>% 
   summarize(sum_acres = sum(weighted_acres)) %>% 
   ungroup() %>%
   mutate(percentage = sum_acres / total_acres * 100) %>% 
   group_by(spatial_period) %>% 
-  mutate(rating = factor(rating, levels = c("fge", "vpv", "na"))) %>% 
+  mutate(rating = factor(rating, levels = c("insufficient", "poor",  "attaining"))) %>% 
   complete(rating) %>% 
   mutate(sum_pct = sum(percentage, na.rm = TRUE)) %>% 
   ungroup() %>% 
-  mutate(percentage = if_else(rating == "na", 100 - sum_pct, percentage))
-  
+  mutate(percentage = if_else(rating == "insufficient", 100 - sum_pct, percentage)) %>% 
+  select(spatial_period, rating, percentage) %>% 
+  filter(!is.na(percentage))
+```
+
+```{r, fig.width=8, fig.height=5}
+rating.huc12  %>% 
+  arrange(desc(rating)) %>% 
+  ggplot(aes(spatial_period, percentage, fill = rating)) +
+  geom_bar( position = "dodge", stat = "identity") +
+  scale_fill_manual(values = c("attaining" = "#56B4E9",
+                               "poor" = "#E69F00",
+                               "insufficient" = "#999999")) +
+  xlab("Period") +
+  ylab("Mean Percentage") +
+  ggtitle("HUC 12 Weighted")  +
+  theme(plot.title = element_text(hjust = 0.5)) +#,
+        #axis.text.x  = element_text(angle = 330, vjust = 1, hjust = 0))
+  coord_flip()
+```
+
+
+
+
+```{r}
+rating.huc12.weighted <- bibi.sub %>% 
+  group_by(period, subspatial, huc_12) %>% 
+  mutate(huc12_count = n()) %>% 
+  ungroup() %>%  
+  mutate(weighted_acres = acres / huc12_count) %>% 
+  group_by(spatial_period,
+           rating, total_acres) %>% 
+  summarize(sum_acres = sum(weighted_acres)) %>% 
+  ungroup() %>%
+  mutate(percentage = sum_acres / total_acres * 100) %>% 
+  group_by(spatial_period) %>% 
+  mutate(rating = factor(rating, levels = c("insufficient", "poor",  "attaining"))) %>% 
+  complete(rating) %>% 
+  mutate(sum_pct = sum(percentage, na.rm = TRUE)) %>% 
+  ungroup() %>% 
+  mutate(percentage = if_else(rating == "insufficient", 100 - sum_pct, percentage)) %>% 
+  select(spatial_period, rating, percentage) %>% 
+  filter(!is.na(percentage))
+```
+
+
+```{r, fig.width=8, fig.height=5}
+rating.huc12.weighted  %>% 
+  arrange(desc(rating)) %>% 
+  ggplot(aes(spatial_period, percentage, fill = rating)) +
+  geom_bar( position = "dodge", stat = "identity") +
+  scale_fill_manual(values = c("attaining" = "#56B4E9",
+                               "poor" = "#E69F00",
+                               "insufficient" = "#999999")) +
+  xlab("Period") +
+  ylab("Mean Percentage") +
+  ggtitle("HUC 12 Weighted")  +
+  theme(plot.title = element_text(hjust = 0.5)) +#,
+        #axis.text.x  = element_text(angle = 330, vjust = 1, hjust = 0))
+  coord_flip()
 ```
 
 

@@ -2,6 +2,7 @@
 title: "Developing a 2008 Baseline for the CBP Stream Health Outcome Indicator: DRAFT"
 author: "Zachary M. Smith"
 output:
+#  word_document:
   html_document:
     df_print: paged
     toc: yes
@@ -16,6 +17,7 @@ link-citations: true
 ```{r, echo=FALSE, cache=FALSE}
 evaluate <- TRUE
 cache.me <- TRUE
+cache.dir <- "sections/cache"
 run.cedr.acquisition <- FALSE
 ```
 
@@ -24,8 +26,19 @@ run.cedr.acquisition <- FALSE
 
 ```
 
-# Introduction
-```{r child = 'sections/introduction.Rmd', eval=TRUE}
+# Goals
+
+* Select a robust baseline period.
+* Select a sampling grid representative of stream miles.
+* Identify a standard spatial sampling density.
+
+# Background
+```{r child = 'sections/background.Rmd', eval=TRUE}
+
+```
+
+# R
+```{r child = 'sections/methods_r.Rmd', eval=TRUE}
 
 ```
 
@@ -36,6 +49,63 @@ run.cedr.acquisition <- FALSE
 
 # Prepare Data
 ```{r child = 'sections/prepare_data.Rmd', eval=TRUE}
+
+```
+
+# Maps
+```{r child = 'sections/map_functions.Rmd', eval=FALSE}
+
+```
+
+```{r child = 'sections/map_import.Rmd', eval=FALSE}
+
+```
+
+```{r child = 'sections/map_plots.Rmd', eval=FALSE}
+
+```
+
+# Bootstrap Sampling
+```{r child = 'sections/bootstrap_overview.Rmd', eval=TRUE}
+
+```
+
+## Functions
+```{r child = 'sections/bootstrap_functions.Rmd', eval=TRUE}
+
+```
+
+## Grids Explored
+
+The grids explored are organized from largest to smallest cell sizes.
+
+### Bioregion
+```{r child = 'sections/bootstrap_bioregion.Rmd', eval=TRUE}
+
+```
+
+### HUC 6
+```{r child = 'sections/bootstrap_huc6.Rmd', eval=TRUE}
+
+```
+
+### HUC 8
+```{r child = 'sections/bootstrap_huc8.Rmd', eval=TRUE}
+
+```
+
+### HUC 10
+```{r child = 'sections/bootstrap_huc10.Rmd', eval=TRUE}
+
+```
+
+### HUC 12
+```{r child = 'sections/bootstrap_huc12.Rmd', eval=TRUE}
+
+```
+
+### Catchment
+```{r child = 'sections/bootstrap_catchment.Rmd', eval=TRUE}
 
 ```
 

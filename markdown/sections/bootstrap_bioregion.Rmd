@@ -1,0 +1,47 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "January 3, 2018"
+output: html_document
+---
+
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
+```
+
+The BIBI data frame (`bibi.df`) is subset to only represent unique bioregion categories. This data frame contains all of the bioregions defined in the Chesapeake Bay basin by Smith et al (2017) __ADD REF__.
+```{r}
+bioregion.df <- bibi.df %>% 
+  select(subspatial) %>% 
+  filter(!subspatial %in% c("inland", "coast")) %>% 
+  rename(bioregion =  subspatial) %>% 
+  distinct()
+```
+
+Nest the data frame by sampling period (`period`), spatial resolution (`spatial`), and bioregion (`biregion`) in preparation of performing the bootstrap analyses (see [Nested Data Frame]).
+```{r}
+bibi.nest.bioregion <- nest_df(bibi.sub, bioregion.df, bioregion) 
+```
+
+Perform the bootstrap analyses for each sampling period (`period`), spatial resolution (`spatial`), and bioregion (`bioregion`) (see [Multiple Bootstrap Ratings]).
+```{r}
+boot.bioregion <- multi_bootstrap_ratings(bibi.nest.bioregion, boot.reps, boot.samp.sizes,
+                                     spatial.vec, periods.vec)
+```
+
+Generate bar plots with standard deviation bars for each rating category by sampling period (`period`) and spatial resolution (`spatial`) (see [Bootstrap Bar Plots]).
+```{r, fig.width = 8, fig.height = 7}
+plot_boot_bar(boot.bioregion, periods.vec, title = "Bioregion")
+```
+
+Generate line plots of standard deviation bars for each rating category by bootstrap sampling size (see [Bootstrap Standard Deviation Plots]). Each plot represents a unique sampling period (`period`) and spatial resolution (`spatial`).
+```{r, fig.width = 8, fig.height = 7}
+plot_boot_sd(boot.bioregion, periods.vec, title = "Bioregion")
+```
+
+Generate area plots of the proportion of each rating after excluding samples classified as insufficient (see [Bootstrap Area Plots]). Each plot represents a unique sampling period (`period`) and spatial resolution (`spatial`).
+```{r, fig.width = 15, fig.height = 7}
+exclude_insufficient(boot.bioregion) %>% 
+rating_area_plot("Bioregion")
+```

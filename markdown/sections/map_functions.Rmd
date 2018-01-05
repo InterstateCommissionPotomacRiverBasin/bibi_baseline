@@ -1,0 +1,125 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "January 4, 2018"
+output: html_document
+---
+
+## Map Functions
+
+```{r}
+#df <- county.df
+#region <- rlang::quo(gregion)
+df_to_sp <- function(df, region) {
+  region <- rlang::enquo(region)
+  
+  region.vec <- df %>% 
+    select(!!region) %>% 
+    distinct() %>% 
+    pull((!!region))
+  
+  final.poly <- lapply(region.vec, function(region.i) {
+    df %>% 
+      filter(rlang::UQ(region) %in% region.i) %>% 
+      select(long, lat) %>% 
+      Polygon() %>% 
+      list() %>% 
+      Polygons(ID = region.i) %>% 
+      list()
+  }) %>% 
+    unlist() %>% 
+    SpatialPolygons()
+  return(final.poly)
+}
+```
+
+```{r}
+poly_to_spdf <- function(spoly){
+  region.vec <- unique(names(spoly))
+  
+  proj4string(spoly) <- CRS("+init=epsg:4269")
+  CRS.new <- CRS("+proj=longlat +datum=NAD83 +no_defs +ellps=GRS80 +towgs84=0,0,0")
+  final.spdf <- spTransform(spoly, CRS.new)  %>% 
+    SpatialPolygonsDataFrame(data.frame(id = region.vec,
+                                                     row.names = region.vec))
+  return(final.spdf)
+}
+```
+
+`rgeos::gBuffer()` is used prevent issue with clipping in subsequent code chunks.
+```{r}
+prep_spdf <- function(df, region) {
+  region <- rlang::enquo(region)
+  
+  final.spdf <- df_to_sp(df, !!region) %>% 
+    gBuffer(width = 0, byid = TRUE) %>% 
+    poly_to_spdf()
+  
+  return(final.spdf)
+}
+```
+
+```{r, evel=FALSE}
+calc_area <- function(spdf) {
+  lapply(unique(spdf$id), function(i) {
+  final.df <- data.frame(id = i, stringsAsFactors = FALSE)
+  final.df$area <- gArea(spdf[spdf$id == i, ])
+  final.df
+}) %>% 
+  bind_rows()
+}
+
+#county.area <- calc_area(county.spdf)
+#state.area <- calc_area(state.clip) %>% 
+#   mutate(state = case_when(
+#    str_detect(id, "district") ~ "district of columbia",
+#    str_detect(id, "delaware") ~ "delaware",
+#    str_detect(id, "maryland") ~ "maryland",
+#    str_detect(id, "virginia") ~ "virginia",
+#    str_detect(id, "west virginia") ~ "west virginia",
+#    str_detect(id, "pennsylvania") ~ "pennsylvania",
+#    str_detect(id, "new york") ~ "new york",
+#    TRUE ~ "ERROR"
+#  )) %>% 
+#  group_by(state) %>% 
+#  summarize(area = sum(area))
+```
+
+```{r}
+state_maps <- function(bibi.state, state.clip, state) {
+  
+  state.fort <- suppressMessages(fortify(state.clip)) %>% 
+  filter(str_detect(.$id, state))
+    
+  
+  state.program <- case_when(
+    state == "delaware" ~ "DNREC",
+    state == "maryland" ~ "MDDNR",
+    state == "new york" ~ "NYDEC",
+    state == "pennsylvania" ~ "PADEP",
+    state == "virginia" ~ "VADEQ",
+    state == "west virginia" ~ "WVDEP",
+    state == "district of columbia" ~ "DDOE",
+    TRUE ~ "ERROR"
+      )
+  
+  ggplot() +
+  geom_polygon(data = state.fort,
+               aes(long, lat, group = group),
+               color = "black", fill = "#999999") +
+  #annotation_map(fortify(clip2), fill = "#999999", colour = "black") +
+  geom_point(data = bibi.state[bibi.state$state_program == state.program, ],
+             aes(longitude, latitude), color = "#0072B2") +
+  coord_equal() +
+  theme_bw() +
+  theme(legend.position = "none",
+        axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()) +
+    labs(title = state.program) +
+  facet_wrap(~year, ncol = 6)
+}
+```
