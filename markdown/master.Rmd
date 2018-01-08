@@ -22,7 +22,7 @@ run.cedr.acquisition <- FALSE
 ```
 
 # Abstract
-```{r child = 'sections/abstract.Rmd', eval=TRUE}
+```{r child = 'sections/prep/abstract.Rmd', eval=TRUE}
 
 ```
 
@@ -33,45 +33,45 @@ run.cedr.acquisition <- FALSE
 * Identify a standard spatial sampling density.
 
 # Background
-```{r child = 'sections/background.Rmd', eval=TRUE}
+```{r child = 'sections/prep/background.Rmd', eval=TRUE}
 
 ```
 
 # R
-```{r child = 'sections/methods_r.Rmd', eval=TRUE}
+```{r child = 'sections/prep/methods_r.Rmd', eval=TRUE}
 
 ```
 
 # Data Acquisition
-```{r child = 'sections/data_acquisition_cedr.Rmd', eval=TRUE}
+```{r child = 'sections/data_acquistion/data_acquisition_cedr.Rmd', eval=TRUE}
 
 ```
 
 # Prepare Data
-```{r child = 'sections/prepare_data.Rmd', eval=TRUE}
+```{r child = 'sections/prep/prepare_data.Rmd', eval=TRUE}
 
 ```
 
 # Maps
-```{r child = 'sections/map_functions.Rmd', eval=FALSE}
+```{r child = 'sections/maps/map_functions.Rmd', eval=FALSE}
 
 ```
 
-```{r child = 'sections/map_import.Rmd', eval=FALSE}
+```{r child = 'sections/maps/map_import.Rmd', eval=FALSE}
 
 ```
 
-```{r child = 'sections/map_plots.Rmd', eval=FALSE}
+```{r child = 'sections/maps/map_plots.Rmd', eval=FALSE}
 
 ```
 
 # Bootstrap Sampling
-```{r child = 'sections/bootstrap_overview.Rmd', eval=TRUE}
+```{r child = 'sections/ratings/bootsrap/bootstrap_overview.Rmd', eval=TRUE}
 
 ```
 
 ## Functions
-```{r child = 'sections/bootstrap_functions.Rmd', eval=TRUE}
+```{r child = 'sections/ratings/bootsrap/bootstrap_functions.Rmd', eval=TRUE}
 
 ```
 
@@ -80,32 +80,32 @@ run.cedr.acquisition <- FALSE
 The grids explored are organized from largest to smallest cell sizes.
 
 ### Bioregion
-```{r child = 'sections/bootstrap_bioregion.Rmd', eval=TRUE}
+```{r child = 'sections/ratings/bootsrap/bootstrap_bioregion.Rmd', eval=TRUE}
 
 ```
 
 ### HUC 6
-```{r child = 'sections/bootstrap_huc6.Rmd', eval=TRUE}
+```{r child = 'sections/ratings/bootsrap/bootstrap_huc6.Rmd', eval=TRUE}
 
 ```
 
 ### HUC 8
-```{r child = 'sections/bootstrap_huc8.Rmd', eval=TRUE}
+```{r child = 'sections/ratings/bootsrap/bootstrap_huc8.Rmd', eval=TRUE}
 
 ```
 
 ### HUC 10
-```{r child = 'sections/bootstrap_huc10.Rmd', eval=TRUE}
+```{r child = 'sections/ratings/bootsrap/bootstrap_huc10.Rmd', eval=TRUE}
 
 ```
 
 ### HUC 12
-```{r child = 'sections/bootstrap_huc12.Rmd', eval=TRUE}
+```{r child = 'sections/ratings/bootsrap/bootstrap_huc12.Rmd', eval=TRUE}
 
 ```
 
 ### Catchment
-```{r child = 'sections/bootstrap_catchment.Rmd', eval=TRUE}
+```{r child = 'sections/ratings/bootsrap/bootstrap_catchment.Rmd', eval=TRUE}
 
 ```
 
