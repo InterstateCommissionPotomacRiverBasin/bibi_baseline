@@ -52,40 +52,22 @@ bibi.df <- bibi.df %>%
          category = factor(category, levels = c("ref", "min", "mod", "deg", "mix")))
 ```
 
-### HUCs
-Import Hydrologic Unit Codes (HUC) for all of the HUCs represented within the Chesapeake Bay basin. Retain only the necessary columns. Columns `acres` and `states` reflect HUC 12 area ($$acres^2$$) and the state(s) which fall within the HUC 12, respectively. HUC 12's "020600010000", "020801010000", and "020700111001" represent different portions of the Chesapeake Bay and are removed from the data frame. The area in $$acres^2$$ of the basin (`total_accres`) is found by summing all of the HUC 12 `acres`.
+
+### Prepare Grids
+
+#### Hydrologic Unit Codes (HUCs)
+
+Hydrologic unit codes (HUCs) 8, 10, and 12 were already present in the Chessie BIBI data. HUC4 (`huc4`) and HUC6 (`huc6`) are extracted from the HUC8 column (`huc8`).
 ```{r}
-huc12.df <- data.table::fread(file.path(project.dir, "data/grid_info/huc12.csv"),
-                             colClasses = c(huc_2 = "character",
-                                            huc_4 = "character",
-                                            huc_6 = "character",
-                                            huc_8 = "character",
-                                            huc_10 = "character",
-                                            huc_12 = "character"),
-                             na.strings = "0na") %>% 
-  select(huc_12, huc_10, huc_8, huc_6, acres, states) %>% 
-  rename(huc12 = huc_12,
-         huc10 = huc_10,
-         huc8 = huc_8,
-         huc6 = huc_6) %>% 
-  mutate(huc12 = paste0("0", huc12),
-         huc10 = paste0("0", huc10),
-         huc8 = paste0("0", huc8),
-         huc6 = paste0("0", huc6)
-         ) %>% 
-  filter(!huc12 %in% c("020600010000", "020801010000", "020700111001"),
-         !huc6 %in% "020402") %>% 
-  distinct() %>% 
-  mutate(total_acres = sum(acres))
+bibi.df <- bibi.df %>% 
+  mutate(huc4 = str_sub(huc8, 1, 4),
+         huc6 = str_sub(huc8, 1, 6))
 ```
 
-Join the rating data (`bibi.df`) with the HUC 12 data (`huc12.df`) to obtain the square acres each HUC 12 represents (`acres`) and the states that the HUC 12 falls within (`states`).
-```{r}
-bibi.df <- left_join(bibi.df, huc12.df, by = c("huc8", "huc10", "huc12"))
-```
 
 #### Catchment
 
+Assigning the appropriate catchment is more difficult than assigning lower resolution HUCs.
 ```{r}
 pts_in_poly <- function(points.df, polygon, poly.col) {
   crs <- proj4string(polygon)

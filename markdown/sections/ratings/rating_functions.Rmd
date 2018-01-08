@@ -1,0 +1,20 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "January 8, 2018"
+output: html_document
+---
+
+```{r}
+aggregate_grid <- function(grid.df, grid.col, value.col) {
+  grid.col <- rlang::enquo(grid.col)
+  value.col <- rlang::enquo(value.col)
+  
+  grid.df %>% 
+    select(rlang::UQ(grid.col), rlang::UQ(value.col)) %>% 
+    distinct() %>% 
+    group_by(rlang::UQ(grid.col))  %>% 
+    summarize(rlang::UQ(rlang::quo_name(value.col)) := sum(rlang::UQ(value.col)))
+}
+```
+
