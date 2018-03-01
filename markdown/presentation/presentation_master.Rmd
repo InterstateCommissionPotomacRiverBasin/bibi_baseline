@@ -1,0 +1,72 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "February 26, 2018"
+output: ioslides_presentation
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+project.dir <- rprojroot::find_rstudio_root_file()
+```
+
+## Six Methods
+
+1. No Spatial Aggregation
+2. Waterhsed Mean Score
+3. Ratings Weighted by Area or Stream Mile
+4. Random Sample
+5. Bootstrap
+6. Random Forest
+
+## No Spatial Aggregation
+
+```{r, fig.width=9, fig.height=6, fig.show='hold', fig.align='center'}
+imager::load.image(file.path(project.dir, "markdown/presentation/figures/results/no_spatial/no_spatial_bar.png")) %>% 
+  plot(axes = F)
+```
+
+## Cell Mean Score
+
+```{r, fig.width=9, fig.height=7, fig.show='hold', fig.align='center'}
+imager::load.image(file.path(project.dir,
+                             "markdown/presentation/figures/results/mean/mean_bar.png")) %>% 
+  plot(axes = F)
+```
+
+## Weighted Ratings
+
+```{r, fig.width=9, fig.height=6, fig.show='hold', fig.align='center'}
+imager::load.image(file.path(project.dir, "markdown/presentation/figures/results/area_weighted/area_weighted_bar.png")) %>% 
+  plot(axes = F)
+```
+
+## Weighted Ratings
+
+```{r, fig.width=9, fig.height=6, fig.show='hold', fig.align='center'}
+imager::load.image(file.path(project.dir, "markdown/presentation/figures/results/area_weighted/stream_weighted_bar.png")) %>% 
+  plot(axes = F)
+```
+
+## Random Sample
+
+```{r, fig.width=9, fig.height=6, fig.show='hold', fig.align='center'}
+imager::load.image(file.path(project.dir,
+                             "markdown/presentation/figures/results/random/random_bar.png")) %>% 
+  plot(axes = F)
+```
+
+## Bootstrap
+
+```{r, fig.width=9, fig.height=6, fig.show='hold', fig.align='center'}
+imager::load.image(file.path(project.dir, "markdown/presentation/figures/results/no_spatial/no_spatial_bar.png")) %>% 
+  plot(axes = F)
+```
+
+## Random Forest
+
+```{r, fig.width=6, fig.height=6, fig.show='hold', fig.align='center'}
+imager::load.image(file.path(project.dir, "markdown/presentation/figures/results/random_forest/rf_prediction_uncertain.jpg")) %>% 
+  plot(axes = F)
+```
