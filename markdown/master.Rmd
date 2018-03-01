@@ -17,8 +17,12 @@ link-citations: true
 ```{r, echo=FALSE, cache=FALSE}
 evaluate <- TRUE
 cache.me <- TRUE
-cache.dir <- "sections/cache"
+cache.dir <- file.path(rprojroot::find_rstudio_root_file(), "sections/cache/")
 run.cedr.acquisition <- FALSE
+```
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(cache.path=cache.dir)
 ```
 
 # Abstract
@@ -29,7 +33,7 @@ run.cedr.acquisition <- FALSE
 # Goals
 
 * Select a robust baseline period.
-* Select a sampling grid representative of stream miles.
+* Select a spatial unit to represent stream miles.
 * Identify a standard spatial sampling density.
 
 # Background
@@ -43,16 +47,18 @@ run.cedr.acquisition <- FALSE
 ```
 
 # Data Acquisition
-```{r child = 'sections/data_acquistion/data_acquisition_cedr.Rmd', eval=TRUE}
+```{r Data Acquisition, child = 'sections/data_acquistion/data_acquisition_cedr.Rmd', eval=FALSE}
 
 ```
 
-# Prepare Data
-```{r child = 'sections/prep/prepare_data.Rmd', eval=TRUE}
+# Data Exploration
+
+## Sample Counts
+```{r child = 'sections/prep/prepare_sample_counts.Rmd', eval=TRUE}
 
 ```
 
-# Maps
+## Maps
 ```{r child = 'sections/maps/map_functions.Rmd', eval=FALSE}
 
 ```
@@ -65,49 +71,69 @@ run.cedr.acquisition <- FALSE
 
 ```
 
-# Bootstrap Sampling
-```{r child = 'sections/ratings/bootsrap/bootstrap_overview.Rmd', eval=TRUE}
+# Prepare Data
+```{r child = 'sections/prep/prepare_data.Rmd', eval=TRUE}
 
 ```
 
-## Functions
-```{r child = 'sections/ratings/bootsrap/bootstrap_functions.Rmd', eval=TRUE}
+# Methods
+
+The R functions below should enable anyone to re-create the results found in this document. Associated with each function is a brief description of what the function does and often some explanation of how to use the function.
+
+```{r child = 'sections/ratings/rating_functions.Rmd', eval=TRUE}
 
 ```
 
-## Grids Explored
+## Bootstrap Methods
 
-The grids explored are organized from largest to smallest cell sizes.
-
-### Bioregion
-```{r child = 'sections/ratings/bootsrap/bootstrap_bioregion.Rmd', eval=TRUE}
+```{r child = 'sections/ratings/bootstrap/bootstrap_overview.Rmd', eval=TRUE}
 
 ```
 
-### HUC 6
-```{r child = 'sections/ratings/bootsrap/bootstrap_huc6.Rmd', eval=TRUE}
+```{r child = 'sections/ratings/bootstrap/bootstrap_functions.Rmd', eval=TRUE}
 
 ```
 
-### HUC 8
-```{r child = 'sections/ratings/bootsrap/bootstrap_huc8.Rmd', eval=TRUE}
+# Results
+
+```{r child = 'sections/ratings/ratings.Rmd', eval=TRUE}
 
 ```
 
-### HUC 10
-```{r child = 'sections/ratings/bootsrap/bootstrap_huc10.Rmd', eval=TRUE}
+### Spatial Units Explored
+
+The spatial units explored are organized from largest to smallest cell sizes.
+
+#### HUC 8
+```{r child = 'sections/ratings/bootstrap/bootstrap_huc8.Rmd', eval=TRUE}
 
 ```
 
-### HUC 12
-```{r child = 'sections/ratings/bootsrap/bootstrap_huc12.Rmd', eval=TRUE}
+#### HUC 10
+```{r child = 'sections/ratings/bootstrap/bootstrap_huc10.Rmd', eval=TRUE}
 
 ```
 
-### Catchment
-```{r child = 'sections/ratings/bootsrap/bootstrap_catchment.Rmd', eval=TRUE}
+#### HUC 12
+```{r child = 'sections/ratings/bootstrap/bootstrap_huc12.Rmd', eval=TRUE}
 
 ```
+
+#### Catchment
+```{r child = 'sections/ratings/bootstrap/bootstrap_catchment.Rmd', eval=TRUE}
+
+```
+
+## Random Forest
+
+
+# Discussion
+```{r child = 'sections/discussion/discussion.Rmd', eval=TRUE}
+
+```
+
+# Conclusions and Recommendations
+
 
 # Citations
 
