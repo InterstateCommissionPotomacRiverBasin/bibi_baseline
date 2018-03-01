@@ -1,168 +1,150 @@
 ---
 title: "Untitled"
 author: "Zachary M. Smith"
-date: "December 26, 2017"
+date: "March 1, 2018"
 output: html_document
 ---
 
-```{r echo=FALSE}
-knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
-```
+## Individual Sample Ratings
 
-```{r}
-rate_index_5 <- function(x, score.col) {
-  score.col <- rlang::enquo(score.col)
-  x %>% 
-    mutate(rating = case_when(
-      (!!score.col )< half_ref_10 ~ "very_poor",
-      (!!score.col )>= half_ref_10 & (!!score.col )< ref_10 ~ "poor",
-      (!!score.col )>= ref_10 & (!!score.col )< ref_25 ~ "fair",
-      (!!score.col )>= ref_25 & (!!score.col )< ref_50 ~ "good",
-      (!!score.col )>= ref_50 ~ "excellent",
-      TRUE ~ "ERROR"
-    )) %>% 
-    pull(rating)
-}
-```
+The simplest way to summarize the ratings is to find the percentage of sampling events that are classified as each rating without aggregating the data spatially. The issue with this procedure is the samples are not randomly distributed throughout the basin, and therefore have spatial biases. Additionally, this method provides no way of identifying how much of the basin has been unassessed or has insufficient samples.
+
 
 
 ```{r}
-rate_index_2 <- function(x, score.col) {
-  score.col <- rlang::enquo(score.col)
-  x %>% 
-    mutate(rating = case_when(
-      (!!score.col) < ref_10 ~ "pvp",
-      (!!score.col) >= ref_10  ~ "fge",
-      TRUE ~ "ERROR"
-    )) %>% 
-    pull(rating)
-}
-```
-
-```{r}
-bioregions <- bibi.sub %>% 
-  filter(spatial == "bioregion") %>% 
-  select(subspatial, unique_id) %>% 
-  rename(bioregions = subspatial) %>% 
-  distinct()
-```
-
-```{r}
-bibi.sub <- left_join(bibi.sub, bioregions, by = "unique_id") %>% 
-  unite(spatial_period, spatial, period, remove = FALSE)
-```
-
-
-```{r}
-rating.raw <- bibi.sub %>% 
+rating.no.spatial <- bibi.sub %>% 
   group_by(spatial_period) %>% 
   mutate(total = n()) %>% 
-  ungroup() %>% 
   group_by(spatial_period, rating, total) %>% 
   summarize(count = n()) %>% 
   ungroup() %>% 
   mutate(percentage = count / total * 100) %>% 
-  select(spatial_period, rating, percentage)
-  
+  rating_summarize_pct() %>% 
+  mutate(method = "no_spatial",
+         stream_miles = percentage * sum(su.df$stream_miles, na.rm = TRUE) / 100)
 ```
 
-```{r, fig.width=8, fig.height=5}
-rating.raw %>% 
-  ggplot(aes(spatial_period, percentage, fill = rating)) +
-  geom_bar( position = "dodge", stat = "identity") +
-  scale_fill_manual(values = c("attaining" = "#56B4E9",
-                               "poor" = "#E69F00",
-                               "insufficient" = "#999999")) +
-  xlab("Period") +
-  ylab("Mean Percentage") +
-  ggtitle("Raw")  +
-  theme(plot.title = element_text(hjust = 0.5)) +#,
-        #axis.text.x  = element_text(angle = 330, vjust = 1, hjust = 0))
-  coord_flip()
-```
-
-
-
-
-
+Plot the data using the function created in [Rating Functions].
 
 ```{r}
-rating.huc12 <- bibi.sub %>% 
-  group_by(period, subspatial, huc_12) %>% 
-  mutate(huc12_count = n()) %>% 
-  ungroup() %>%  
-  mutate(weighted_acres = acres / huc12_count) %>% 
-  group_by(spatial_period,
-           rating, total_acres) %>% 
-  summarize(sum_acres = sum(weighted_acres)) %>% 
-  ungroup() %>%
-  mutate(percentage = sum_acres / total_acres * 100) %>% 
-  group_by(spatial_period) %>% 
-  mutate(rating = factor(rating, levels = c("insufficient", "poor",  "attaining"))) %>% 
-  complete(rating) %>% 
-  mutate(sum_pct = sum(percentage, na.rm = TRUE)) %>% 
-  ungroup() %>% 
-  mutate(percentage = if_else(rating == "insufficient", 100 - sum_pct, percentage)) %>% 
-  select(spatial_period, rating, percentage) %>% 
-  filter(!is.na(percentage))
+rating.no.spatial2 <- no_spatial_rating(bibi.sub, su.df)
+no.spatial.bar <- plot_rating(rating.no.spatial, "Individual Sample Ratings")
+no.spatial.bar
 ```
 
-```{r, fig.width=8, fig.height=5}
-rating.huc12  %>% 
-  arrange(desc(rating)) %>% 
-  ggplot(aes(spatial_period, percentage, fill = rating)) +
-  geom_bar( position = "dodge", stat = "identity") +
-  scale_fill_manual(values = c("attaining" = "#56B4E9",
-                               "poor" = "#E69F00",
-                               "insufficient" = "#999999")) +
-  xlab("Period") +
-  ylab("Mean Percentage") +
-  ggtitle("HUC 12 Weighted")  +
-  theme(plot.title = element_text(hjust = 0.5)) +#,
-        #axis.text.x  = element_text(angle = 330, vjust = 1, hjust = 0))
-  coord_flip()
-```
+## Mean Rating
 
+The mean BIBI score within each HUC 12 is calculated and used to assign the HUC 12 a rating. This method reduces the weight of densely sampled areas but may also misrepresent areas with low sample density. There are many instances where there is one representative sample for a HUC 12. It is possible that the one representative sample accurately represents the HUC 12 but it could also be a degraded representative of the HUC 12 as a whole. The strength in finding the mean relies on have a large enough sample size to accurately represent the HUC 12; no one sampling event is given too much weight. This issue could be reduced by requiring a minimum number of samples be collected from a HUC 12 before the HUC 12 can be evaluated with a mean score and rating.
 
-
+The rating data (bibi.huc12) is merged with the HUC 12 information (huc12.df). The mean score per HUC 12 (mean_score) is found using dplyr::group_by() and dplyr::summarize(). Mean scores are then rated using the rate_index_3() function created in the [Rating Functions] section. The total number of HUC 12s represented in the basin (total) are found and used to find the percentage of HUC 12s represented by each rating category (percentage). The function, rating_summarize_pct(), created in the [Rating Functions] section, is used to prepare the data for plotting.
 
 ```{r}
-rating.huc12.weighted <- bibi.sub %>% 
-  group_by(period, subspatial, huc_12) %>% 
-  mutate(huc12_count = n()) %>% 
-  ungroup() %>%  
-  mutate(weighted_acres = acres / huc12_count) %>% 
-  group_by(spatial_period,
-           rating, total_acres) %>% 
-  summarize(sum_acres = sum(weighted_acres)) %>% 
-  ungroup() %>%
-  mutate(percentage = sum_acres / total_acres * 100) %>% 
-  group_by(spatial_period) %>% 
-  mutate(rating = factor(rating, levels = c("insufficient", "poor",  "attaining"))) %>% 
-  complete(rating) %>% 
-  mutate(sum_pct = sum(percentage, na.rm = TRUE)) %>% 
+mean.rating.df <- loop_cell_rating(bibi.sub, su.df,
+                                   unit.col = "stream_miles",
+                                   su.vec = c("huc8", "huc10", "huc12", "catchment"),
+                                   job = "mean_rating")
+
+mean.rating.df <- mean.rating.df %>% 
   ungroup() %>% 
-  mutate(percentage = if_else(rating == "insufficient", 100 - sum_pct, percentage)) %>% 
-  select(spatial_period, rating, percentage) %>% 
-  filter(!is.na(percentage))
+  group_by(spatial_period, method) %>% 
+  mutate(total_miles = sum(stream_miles, na.rm = TRUE))
+Plot the data using the function created in [Rating Functions].
+
+mean.bar <- plot_rating(mean.rating.df, "Mean Rating") +
+  facet_wrap(~su, ncol = 1)
 ```
 
-
-```{r, fig.width=8, fig.height=5}
-rating.huc12.weighted  %>% 
-  arrange(desc(rating)) %>% 
-  ggplot(aes(spatial_period, percentage, fill = rating)) +
-  geom_bar( position = "dodge", stat = "identity") +
-  scale_fill_manual(values = c("attaining" = "#56B4E9",
-                               "poor" = "#E69F00",
-                               "insufficient" = "#999999")) +
-  xlab("Period") +
-  ylab("Mean Percentage") +
-  ggtitle("HUC 12 Weighted")  +
-  theme(plot.title = element_text(hjust = 0.5)) +#,
-        #axis.text.x  = element_text(angle = 330, vjust = 1, hjust = 0))
-  coord_flip()
+```{r}
+mean.bar
 ```
 
+## Area Weighted Rating
+
+Each HUC 12’s area is divided evenly by the number of samples collected within the HUC 12. The segregated HUC 12 area is then used to weight the ratings when summarizing the percentage of the basin represented by each rating. Similar to the HUC 12 [Mean Score], this method reduces the weight of densely sampled areas but may also misrepresent areas with low sample density. This issue could also be resolved by requiring a minimum number of samples per HUC 12 for the HUC 12 to contribute to the summary of basin wide stream condition.
+
+Arguably, the area weighted method is a better representation of the ratings then the [Mean Score]. The rating classification was created at a sampling event scale, and therefore assigning ratings after averaging multiple sampling event scores at the HUC 12 resolution may have some unintended effect on the rating assigned. Also, the [Mean Score] may tend towards a Fair rating in highly vairable HUC 12s. For example, a HUC 12 may be represented by two sampling events, one with a score that results in a rating of Acceptable and the other resulting in a rating of degraded. If these scores are averaged together they will likely classify the HUC 12 as Fair. Fair could be agrued as an appropriate rating for the HUC 12 but the area weighted method seems to remain more true to the orginal data because the HUC 12’s area would be evenly divided to represent one half as Acceptable and the other half as degraded. Prefferably no spatial aggregation would be required but, due to uneven sampling densities thourghout the basin, it is necessary to reduce spatial bias by assigning an appropriate spatial weight; the area weighting method appears to provide a better representation of the data.
+
+The number of sampling events in each HUC 12 is found (huc12_count) and divided from the total HUC 12 area (area) to produce the weighted area (weighted_area) that will represent each sampling events rating in the HUC 12. The data is aggregated by spatial resolution and sampling period (spatial_period), rating, and the total Chesapeake Bay basin area (total). This allows the wieghted areas to be summarized to the total area of the basin represented by each rating category (sum_area), which subsequently can be used to calculate the percentage of the basin represented by each rating category (percentage = sum_area / total * 100). The function, rating_summarize_pct(), created in the [Rating Functions] section, is used to prepare the data for plotting.
+
+### Cell Area
+
+Weight the Chessie BIBI ratings by spatial unit area.
+
+```{r}
+area.weight.rating.df <- loop_cell_rating(bibi.sub, su.df,
+                                   unit.col = "area",
+                                   su.vec = c("huc8", "huc10", "huc12", "catchment"),
+                                   job = "weighted_rating")
+
+area.weight.rating.df <- area.weight.rating.df %>% 
+  ungroup() %>% 
+  group_by(spatial_period, method) %>% 
+  mutate(total_area = sum(area, na.rm = TRUE))
+```
+
+Plot the data using the function created in [Rating Functions].
+
+```{r}
+aw.bar <- plot_rating(area.weight.rating.df, "Weighted by Cell Area") +
+  facet_wrap(~su, ncol = 1)
+
+aw.bar
+```
+
+### Stream Miles
+
+Weight the Chessie BIBI ratings by the number of stream miles in each spatial unit.
+
+```{r}
+stream.weight.rating.df <- loop_cell_rating(bibi.sub, su.df,
+                                   unit.col = "stream_miles",
+                                   su.vec = c("huc8", "huc10", "huc12", "catchment"),
+                                   job = "weighted_rating")
+
+stream.weight.rating.df<- stream.weight.rating.df %>% 
+  ungroup() %>% 
+  group_by(spatial_period, method) %>% 
+  mutate(total_miles = sum(stream_miles, na.rm = TRUE))
+```
+
+Plot the data using the function created in [Rating Functions].
+
+```{r}
+sm.bar <- plot_rating(stream.weight.rating.df, "Weighted by Stream Mile") +
+  facet_wrap(~su, ncol = 1)
+
+sm.bar
+```
+
+## Random Sample
+
+Chessie BIBI ratings are aggregated by a spatial unit, the number of stream miles in each unit cell is determined, and a random selection of one sampling location in each unit cell is used to represent all stream miles in that cell. The number of stream miles representing each rating is then summed to the desired spatial scale. The initial unit must cover the entire Chesapeake basin, including areas of the basin without Chessie BIBI ratings. Additionally, the cells in the spatial unit should be approximately the same size, giving each cell an equal probability of being selected during sampling.
+
+This method reduces spatial bias but may result in a large loss of sample size. Small sample sizes may not accurately represent the basin. Also, a single random sample from a spatial unit cell may be a poor representation of the cell. For example, 9 points in a unit cell may represent “Acceptable” and 1 point may represent “Degraded.” Arguably the cell should probably be rated “Acceptable” but during the random selection it is possible to misrepresent this unit cell by selecting “Degraded.” The bootstrapping method in the section aims to reduce several of the issues associated with one random sample of unit cells to represent the Chesapeake Bay basin.
+
+A random seed is selected using sample(1:10000, 1) (1,018). This seed will ensure that the results from  loop_sample_ratings() are always the same. The reps variable in loop_sample_ratings() is set to one, meaning that the output is a summary of only one random sample of the specified spatial units.
+
+```{r}
+set.seed(1018) # sample(1:10000, 1)
+rand.samp.rating.df <- loop_sample_ratings(bibi.sub, su.df,
+                            su.vec = c("huc8", "huc10", "huc12", "catchment"),
+                            su.density.quantile = 0.1,
+                            reps = 1,
+                            boot.sample.vec = NA,
+                            spatial.vec,
+                            periods.vec) %>% 
+  tidyr::unite(spatial_period, spatial, period, remove = FALSE) %>% 
+  rename(percentage = mean) %>% 
+  mutate(su = factor(su, levels = c("huc8", "huc10", "huc12", "catchment")))
+```
+
+Plot the data using the function created in [Rating Functions].
+
+```{r}
+rand.bar <- plot_rating(rand.samp.rating.df , "Random Sample") +
+  facet_wrap(~su, ncol = 1)
+
+rand.bar
+```
 
 
