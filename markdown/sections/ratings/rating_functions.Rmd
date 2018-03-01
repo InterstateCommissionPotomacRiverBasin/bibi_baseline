@@ -5,16 +5,135 @@ date: "January 8, 2018"
 output: html_document
 ---
 
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
+```
+
+## Rating Classification
+
+Several functions are created to apply the appropriate rating to a BIBI score. The Chessie BIBI data (`bibi.df`) already contains the appropriate rating for each sampling event but if the scores are manipulated in any way, such as averaged together by HUC 12 (see [HUC 12 Mean Score]), then modified scores need to be classified with the appropriate rating. Three functions are created to classify the scores at three different resolutions: High (`rate_index_6()`), Medium (`rate_index_4()`), and Low (`rate_index_3()`).
+
+Classify the scores into six rating categories: Very Poor, Poor, Fair, Good, Excellent, and Insufficient.
 ```{r}
-aggregate_grid <- function(grid.df, grid.col, value.col) {
-  grid.col <- rlang::enquo(grid.col)
+rate_index_6 <- function(x, score.col) {
+  score.col <- rlang::enquo(score.col)
+  
+  x %>% 
+    mutate(rating = case_when(
+      (!!score.col)< half_ref_10 ~ "very_poor",
+      (!!score.col)>= half_ref_10 & (!!score.col )< ref_10 ~ "poor",
+      (!!score.col)>= ref_10 & (!!score.col )< ref_25 ~ "fair",
+      (!!score.col)>= ref_25 & (!!score.col )< ref_50 ~ "good",
+      (!!score.col)>= ref_50 ~ "excellent",
+      is.na(!!score.col) ~ "insufficient",
+      TRUE ~ "ERROR"
+    )) %>% 
+    pull(rating)
+}
+```
+
+Classify the scores into four rating categories: Degraded, Fair, Acceptable, and Insufficient.
+```{r}
+rate_index_4 <- function(x, score.col) {
+  score.col <- rlang::enquo(score.col)
+  
+  x %>% 
+    mutate(rating = case_when(
+      (!!score.col) < ref_10 ~ "Degraded",
+      (!!score.col) >= ref_10 & (!!score.col) < ref_25 ~ "Fair",
+      (!!score.col) >= ref_25 ~ "Acceptable",
+      is.na(!!score.col) ~ "Insufficient",
+      TRUE ~ "ERROR"
+    )) %>% 
+    pull(rating)
+}
+```
+
+Classify the scores into three rating categories: Poor-Very Poor (PVP), Fair-Good-Excellent (FGE), and Insufficient.
+```{r}
+rate_index_3 <- function(x, score.col) {
+  score.col <- rlang::enquo(score.col)
+  
+  x %>% 
+    mutate(rating = case_when(
+      (!!score.col) < ref_10 ~ "pvp",
+      (!!score.col) >= ref_10  ~ "fge",
+      is.na(!!score.col) ~ "insufficient",
+      TRUE ~ "ERROR"
+    )) %>% 
+    pull(rating)
+}
+```
+
+## Summarize Spatial Unit Features
+
+The master spatial unit data frame (`su.df`) contains many different spatial resolutions. Cell area is assigned to only the highest resolution spatial unit (`catchment`) but this allows the data frame to be aggregated by a lower resolution and the area summed to obtain the appropriate cell area for the lower resolution spatial unit. For example, in the [HUC 12 Area Weighted] section the data is aggregated by HUC 12 and the area summed to represent the total area represented within each HUC 12. This aggregation then allows the data to be area weighted at the HUC 12 resolution.
+
+The function subsets the data frame to only include unique rows representing the specified spatial unit column (`su.col`) and the value column (area or stream miles; `value.col`). The data frame is then aggregated by the spatial unit column (`su.col`) and the value column (`value.col`) is summed. Finally, all of the cells are summed to obtain the total area represented within the basin (`total`).
+```{r}
+aggregate_su <- function(su.df, su.col, value.col) {
+  su.col <- rlang::enquo(su.col)
   value.col <- rlang::enquo(value.col)
   
-  grid.df %>% 
-    select(rlang::UQ(grid.col), rlang::UQ(value.col)) %>% 
-    distinct() %>% 
-    group_by(rlang::UQ(grid.col))  %>% 
-    summarize(rlang::UQ(rlang::quo_name(value.col)) := sum(rlang::UQ(value.col)))
+  su.df %>% 
+    select(rlang::UQ(su.col), rlang::UQ(value.col)) %>% 
+    #distinct() %>% 
+    group_by(rlang::UQ(su.col))  %>% 
+    summarize(rlang::UQ(rlang::quo_name(value.col)) := sum(rlang::UQ(value.col))) %>% 
+    ungroup() %>% 
+    mutate(total = sum(rlang::UQ(value.col)))
+}
+```
+
+## Summarize Rating Percentage
+
+For each rating methodology the ratings need to be summarized to represent the percentage of the basin represented by each rating and prepared for plotting. `rating_summarize_pct()` standardizes this process to simplify the code and reduce the potential for errors. The data frame is aggregated by spatial resolution and sampling period (`spatial_period`). Ratings (`rating`) are converted to factors and assigned specific factor levels that will sort the data appropriately in the subsequent plots. `tidyr::complete()` is used to make sure each rating level ("insufficient", "Degraded", "Fair", and "Acceptable") is represented in the data frame for each `spatial_period`. If there is not data for a given rating level, then it will be added and treated as a percentage of zero(`fill = list(percentage = 0)`). The data is then subset to only include the columns necessary for plotting (`spatial_period`, `rating`, and `percentage`). A final check is done to make sure summing all rating percentages per `spatial_period` add up to 100%. If the ratings do not add up to 100% a warning message is printed.
+```{r}
+rating_summarize_pct <- function(x) {
+  final.df <- x %>% 
+  group_by(spatial_period) %>% 
+  mutate(rating = factor(rating, levels = c("Insufficient", "Degraded", "Fair", "Acceptable"))) %>% 
+  complete(rating, fill = list(percentage = 0)) %>% 
+  ungroup() %>% 
+  #select(spatial_period, rating, percentage) %>% 
+  filter(!is.na(percentage))
+  
+  sum.vec <- final.df %>%
+      group_by(spatial_period) %>% 
+      mutate(sum_pct = as.numeric(as.character(sum(percentage)))) %>% 
+      ungroup() %>% 
+      select(sum_pct) %>% 
+      distinct() %>% 
+      pull(sum_pct)
+  if (any(sum.vec != as.double(100))) {
+    warning("The percentages for each spatial period do not add up to 100%.")
+  }
+  
+  return(final.df)
+}
+```
+
+## Rating Plots
+
+`plot_rating()` standardizes the procedure for plotting the rating bar charts.
+```{r}
+plot_rating <- function(x, title) {
+  x  %>% 
+  arrange(desc(rating)) %>% 
+  ggplot(aes(spatial_period, percentage, fill = rating)) +
+  geom_bar( position = "dodge", stat = "identity") +
+    scale_fill_manual(values = c("Insufficient" = "#999999",
+                                 "Degraded" = "#E69F00", #"#D55E00",
+                                 "Fair" = "#F0E442",
+                                 "Acceptable" = "#56B4E9"#"#009E73"
+                                 ),
+                      name = "Rating") +
+  xlab("Period") +
+  ylab("Percentage") +
+  ggtitle(title)  +
+  theme(plot.title = element_text(hjust = 0.5)) +#,
+        #axis.text.x  = element_text(angle = 330, vjust = 1, hjust = 0))
+  coord_flip()
 }
 ```
 
