@@ -43,7 +43,7 @@ sample_ratings <- function(nest.df, reps, boot.sample) {
 pct_ratings <- function(ratings.list, boot.sample) {
   purrr::map(1:length(ratings.list), function(list.i) {
     data.frame(rating = unlist(ratings.list[list.i]), stringsAsFactors = FALSE) %>% 
-      mutate(rating = factor(rating, c("attaining", "poor", "insufficient"))) %>% 
+      mutate(rating = factor(rating, c("acceptable", "degraded", "insufficient"))) %>% 
       group_by(rating) %>% 
       summarize(pct = n() / boot.sample * 100) %>% 
       ungroup() %>% 
@@ -59,8 +59,8 @@ stat_ratings <- function(pct.ratings.list, boot.sample) {
       psych::describe()
   }) %>% 
     bind_rows() %>% 
-    mutate(rating = c("attaining", "poor", "insufficient"),
-           rating = factor(rating, c("attaining", "poor", "insufficient")),
+    mutate(rating = c("acceptable", "degraded", "insufficient"),
+           rating = factor(rating, c("acceptable", "degraded", "insufficient")),
            bootstrap_sample = boot.sample) %>% 
     select(rating, bootstrap_sample, everything(), -vars)
 }
@@ -80,8 +80,8 @@ test4 <- purrr::map(c(10, 50, 100, 500, 1000, 1500, 2000), function(i) {
 
 ggplot(test4, aes(bootstrap_sample, mean, fill = rating)) +
   geom_bar( position = "dodge", stat = "identity") +
-  scale_fill_manual(values = c("attaining" = "#56B4E9",
-                               "poor" = "#E69F00",
+  scale_fill_manual(values = c("acceptable" = "#56B4E9",
+                               "degraded" = "#E69F00",
                                "insufficient" = "#999999")) +
   geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),
                 width = 0.2,                    # Width of the error bars
