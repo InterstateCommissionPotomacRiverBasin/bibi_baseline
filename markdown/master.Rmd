@@ -2,12 +2,12 @@
 title: "Developing a 2008 Baseline for the CBP Stream Health Outcome Indicator: DRAFT"
 author: "Zachary M. Smith"
 output:
-#  word_document:
   html_document:
     df_print: paged
     toc: yes
     toc_depth: '6'
     toc_float: yes
+  word_document:
 bibliography: citations.bib
 link-citations: true
 ---
@@ -32,100 +32,47 @@ knitr::opts_chunk$set(cache.path=cache.dir)
 
 # Goals
 
-* Select a robust baseline period.
-* Select a spatial unit to represent stream miles.
-* Identify a standard spatial sampling density.
+* Select a robust baseline period
+* Select a spatial unit to aggregate sampling events and effectively represent stream miles in the basin
+* Identify a standard spatial sampling density
 
 # Background
 ```{r child = 'sections/prep/background.Rmd', eval=TRUE}
 
 ```
 
-# R
-```{r child = 'sections/prep/methods_r.Rmd', eval=TRUE}
+# Methods
+
+The R scripts and functions below should enable anyone to re-create the results found in this document. Associated with each script and function is a brief description of what the code does. This document was created using __RMarkdown__, to intertwin R codes and text. For more information about R, __R Markdown__, and how to work with or edit this document please review [Appendix A]
+```{r child = 'sections/appendix/appendicies/appendix_a_methods_r.Rmd', eval=TRUE, echo=FALSE}
 
 ```
 
-# Data Acquisition
-```{r Data Acquisition, child = 'sections/data_acquistion/data_acquisition_cedr.Rmd', eval=FALSE}
+## Data Acquisition
 
-```
+Data will eventually be acquired from the Chesapeake Bay Program Chesapeake Environmental Data Repository (CEDR). For more information about this process please review [Appendix B].
 
-# Data Exploration
-
-## Sample Counts
-```{r child = 'sections/prep/prepare_sample_counts.Rmd', eval=TRUE}
-
-```
-
-## Maps
-```{r child = 'sections/maps/map_functions.Rmd', eval=FALSE}
-
-```
-
-```{r child = 'sections/maps/map_import.Rmd', eval=FALSE}
-
-```
-
-```{r child = 'sections/maps/map_plots.Rmd', eval=FALSE}
-
-```
-
-# Prepare Data
+## Prepare Data
 ```{r child = 'sections/prep/prepare_data.Rmd', eval=TRUE}
 
 ```
 
-# Methods
-
-The R functions below should enable anyone to re-create the results found in this document. Associated with each function is a brief description of what the function does and often some explanation of how to use the function.
+## General Rating Functions
 
 ```{r child = 'sections/ratings/rating_functions.Rmd', eval=TRUE}
 
 ```
 
-## Bootstrap Methods
-
-```{r child = 'sections/ratings/bootstrap/bootstrap_overview.Rmd', eval=TRUE}
-
-```
-
-```{r child = 'sections/ratings/bootstrap/bootstrap_functions.Rmd', eval=TRUE}
+## Six Rating Methods
+```{r child = 'sections/ratings/six_rating_methods.Rmd', eval=TRUE}
 
 ```
 
 # Results
 
-```{r child = 'sections/ratings/ratings.Rmd', eval=TRUE}
+```{r child = 'sections/results/results.Rmd', eval=TRUE}
 
 ```
-
-### Spatial Units Explored
-
-The spatial units explored are organized from largest to smallest cell sizes.
-
-#### HUC 8
-```{r child = 'sections/ratings/bootstrap/bootstrap_huc8.Rmd', eval=TRUE}
-
-```
-
-#### HUC 10
-```{r child = 'sections/ratings/bootstrap/bootstrap_huc10.Rmd', eval=TRUE}
-
-```
-
-#### HUC 12
-```{r child = 'sections/ratings/bootstrap/bootstrap_huc12.Rmd', eval=TRUE}
-
-```
-
-#### Catchment
-```{r child = 'sections/ratings/bootstrap/bootstrap_catchment.Rmd', eval=TRUE}
-
-```
-
-## Random Forest
-
 
 # Discussion
 ```{r child = 'sections/discussion/discussion.Rmd', eval=TRUE}
