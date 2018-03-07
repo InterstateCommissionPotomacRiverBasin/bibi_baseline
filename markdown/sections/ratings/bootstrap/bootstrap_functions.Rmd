@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
 ```
 
-These functions standardize the bootstrapping process, so that it can be used to evaluate data at different scales and resolutions.
+The following functions standardize the bootstrapping process, so that it can be used to evaluate data at different scales and resolutions.
 
 #### Spatial Unit Sample Size
 
