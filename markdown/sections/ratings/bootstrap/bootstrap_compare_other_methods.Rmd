@@ -1,0 +1,14 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "January 11, 2018"
+output: html_document
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
+```
+
+```{r}
+
+```

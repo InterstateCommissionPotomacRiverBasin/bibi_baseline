@@ -1,0 +1,83 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "January 11, 2018"
+output: html_document
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
+```
+
+
+
+```{r}
+boot.df <- bind_rows(
+  filter_sample_size(boot.bioregion, "bioregion"),
+  filter_sample_size(boot.huc6, "huc6"),
+  filter_sample_size(boot.huc8, "huc8"),
+  filter_sample_size(boot.huc10, "huc10"),
+  filter_sample_size(boot.huc12, "huc12"),
+  filter_sample_size(boot.catchment, "catchment")
+) %>% 
+  mutate(bootstrap_sample = factor(bootstrap_sample,
+                                   levels = c("bioregion", "huc6",
+                                              "huc8", "huc10",
+                                              "huc12", "catchment")))
+  
+```
+
+```{r, fig.width = 8, fig.height = 15}
+plot_boot_bar(boot.df, periods.vec, title = "boot.df") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+
+```{r, fig.width = 15, fig.height = 15}
+exclude_insufficient(boot.df) %>% 
+  plot_boot_bar( periods.vec, title = "boot.df") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+
+```{r, fig.width = 15, fig.height = 12}
+exclude_insufficient(boot.df) %>% 
+  filter(rating == "Acceptable") %>% 
+  plot_boot_bar( periods.vec, title = "boot.df") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+```{r, fig.width = 15, fig.height = 12}
+exclude_insufficient(boot.df) %>% 
+  filter(rating == "Fair") %>% 
+  plot_boot_bar( periods.vec, title = "boot.df") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+
+```{r, fig.width = 15, fig.height = 12}
+exclude_insufficient(boot.df) %>% 
+  filter(rating == "Degraded") %>% 
+  plot_boot_bar( periods.vec, title = "boot.df") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+
+
+```{r, fig.width = 15, fig.height = 15}
+rating_area_plot(boot.df, "boot.df", vline.on = FALSE, x.numeric = FALSE) 
+```
+
+```{r, fig.width = 15, fig.height = 15}
+exclude_insufficient(boot.df) %>% 
+  rating_area_plot("boot.df", vline.on = FALSE, x.numeric = FALSE) 
+```
+
+```{r}
+total.stream.miles <- su.df %>% 
+  select(stream_segment, stream_miles) %>% 
+  distinct() %>% 
+  summarize(total_miles = sum(stream_miles)) %>% 
+  pull(total_miles)
+
+```
+
