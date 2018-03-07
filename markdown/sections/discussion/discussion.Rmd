@@ -1,0 +1,29 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "March 1, 2018"
+output: html_document
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
+```
+
+Each method explored for summarizing Chessie BIBI ratings in the Chesapeake Bay basin had strengths and weaknesses. Spatial bias was the largest issue to resolve when reporting stream health in the Chesapeake Bay basin. The Chessie BIBI database is a post hoc amalgamation of lotic benthic macroinvertebrate data collected in the basin by various federal, state, county, and volunteer stream monitoring programs with differing sample designs. Although many of these stream monitoring programs followed a random stratified sampling design, each programs sampling design is independent of another. Differences in sampling frequency and density, in general, prevent two independent random stratified sampling designs from being combined to represent one random stratified sampling design. In other words, samples are not randomly distributed across the basin. For example, sampling locations are more numerous and more frequently sampled in urban areas with both state and county monitoring programs compared to rural or forested areas. Five of the six methods explored attempted to reduce spatial bias by aggregating the data into spatial units defined by HUC8, HUC10, and HUC12 watersheds and catchments. Four of the methods (i.e., Watershed Mean Score, Ratings Weighted by Area or Stream Mile, Random Sample, and Bootstrap) use spatial units obtained from the NHDPlus Version 2 medium resolution data set. Method 6, Random Forest, uses ecosheds 1:24,000 high resolution scale catchments [www.ecosheds.org](www.ecosheds.org).
+
+The No Spatial Aggregation was the simplest method explored but also poorly represented the Chesapeake Bay basin. This method does not account for spatial bias, giving more weight to areas with higher sampling frequencies and densities. Due to the greater density of samples in urban areas, and the fact that urban streams are generally more degraded, the overall assessment of Chesapeake streams is biased towards degraded. When results are shown in a low-resolution map, a viewer’s perception of stream condition is also biased by the fact that, in densely sampled areas, dots indicating station results of one category can overlay and mask those of other categories. Additionally, this method provides no direct way to relate the ratings to stream miles and provides no measure of areas (or stream miles) that are insufficiently sampled. The method is useful for other purposes: it indicates where sampling gaps occur, and illustrates station spatial distributions and fine-scale differences between catchments when the results are shown in high-resolution maps.
+
+It is also not inherently simple to assign a sampling point a representative number of stream miles. 
+
+* Should each point represent one stream mile? 
+* Should stream order influence the number of stream miles represented by a point? 
+* If the data is mapped, should the representative stream miles be drawn above the sampling point or be split by the sampling point? 
+    + What if two or more points have overlapping representative stream miles?
+
+The remaining five methods aggregate data by spatial units (i.e., HUC 8, HUC 10, HUC 12, and Catchments). Each spatial unit cell had a known number of stream miles, which were then associated with the assigned Chessie BIBI rating for the spatial unit cell. Additionally, aggregating the Chessie BIBI data by spatial unit provides an estimate of how many stream miles have insufficient data to accurately assign a Chessie BIBI rating in the basin.
+
+The [Watershed Mean Score] method found the mean Chessie BIBI score per spatial unit cell and assigned the appropriate Chessie BIBI rating based on the mean score. Bias caused by data from densely sampled areas is reduced by this method. The mean is a strong indicator when it is derived from large enough sample sizes and individual sampling events are not given undue weight. The method may misrepresent areas where just one sample represents an entire unit cell. Requiring a minimum number of samples per unit cell could resolve the issue; however, it would exclude unit cells with few sample locations and increase the proportion of spatial units classified as Insufficient. Finally, the rating classification scheme was developed for individual sampling events and assigning a rating to the mean of multiple sampling event scores may have unintended consequences.
+
+
+
+
