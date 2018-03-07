@@ -1,0 +1,180 @@
+---
+title: "Results"
+author: "Zachary M. Smith"
+date: "March 1, 2018"
+output: html_document
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
+```
+
+The R-code chunks below, are simply applying the functions described in the [Methods] Section. 
+
+## 1) No Spatial Aggregation
+
+With no spatial aggregation, each of the indices and potential baseline periods produce comparable results (± 1%). "Insufficient" was not represented by this method because this method does not account for any spatial information. Therefore, there can be no estimate of the percentage of streams that are insufficiently sampled.
+```{r}
+rating.no.spatial <- no_spatial_rating(bibi.sub, su.df)
+
+no.spatial.bar <- plot_rating(rating.no.spatial, "Individual Sample Ratings", group.col = NULL)
+
+no.spatial.bar
+```
+
+## 2) Watershed Mean Score
+
+The percentage of the Chesapeake Bay basin within insufficient samples increases as spatial resolution increases from HUC 8 to Catchment. Removing the percentage of Insufficient, allows the percentages from each spatial resolution to be directly compared. In general, percentage of each rating category were similar for all indices and potential baseline periods within a given spatial resolution (i.e., HUC 8, HUC 10, HUC 12, and Catchment). Furthermore, the percentage of streams classified as Acceptable were similar for all indices, potential baseline periods, and spatial resolutions. The percentage of streams classified as Fair decreased with increasing spatial resolution. HUC 8 classified 32-38% as Fair, while at the Catchment resolution 16-19% of streams were classified as Fair. The reduction in the percentage Fair, as spatial resolution increased, generally led to an increase in the percentage of Degraded streams in the basin. At the HUC 8 resolution, 36-41% of streams were classified as Degraded, while at the Catchment resolution 52-54% were classified as Degraded. 
+```{r}
+mean.rating.df <- loop_cell_rating(bibi.sub, su.df,
+                                   unit.col = "stream_miles",
+                                   su.vec = c("huc8", "huc10", "huc12", "catchment"),
+                                   job = "mean_rating")
+
+mean.bar <- plot_rating(mean.rating.df, "Mean Rating") +
+  facet_wrap(~su, ncol = 1)
+```
+
+```{r}
+mean.rating.exc <- exclude_insufficient(mean.rating.df, spatial_period, method, su)
+
+mean.bar.exc <- plot_rating(mean.rating.exc, "Mean Rating (Insufficient Excluded)") +
+  facet_wrap(~su, ncol = 1)
+```
+
+```{r, fig.width = 8, fig.height=10}
+cowplot::plot_grid(mean.bar, mean.bar.exc, ncol = 1)
+```
+
+
+## 3) Ratings Weighted by Area or Stream Mile
+
+The percentage of the Chesapeake Bay basin within insufficient samples increases as spatial resolution increases from HUC 8 to Catchment. Removing the percentage of Insufficient, allows the percentages from each spatial resolution to be directly compared. In general, percentage of each rating category were similar for all indices and potential baseline periods within a given spatial resolution (i.e., HUC 8, HUC 10, HUC 12, and Catchment). The percentage of streams classified as Acceptable deceased has spatial resolution increased. Fair classifications also declined slightly with an increase in spatial resolution. The reduction in these two classifications led to the increase percentage of Degraded streams.
+```{r}
+area.weight.rating.df <- loop_cell_rating(bibi.sub, su.df,
+                                   unit.col = "area",
+                                   su.vec = c("huc8", "huc10", "huc12", "catchment"),
+                                   job = "weighted_rating")
+
+aw.bar <- plot_rating(area.weight.rating.df, "Weighted by Cell Area") +
+  facet_wrap(~su, ncol = 1)
+```
+
+```{r}
+area.weight.rating.exc <- exclude_insufficient(area.weight.rating.df,
+                                               spatial_period, method, su)
+
+aw.bar.exc <- plot_rating(area.weight.rating.exc,
+                            "Weighted by Cell Area (Insufficient Excluded)") +
+  facet_wrap(~su, ncol = 1)
+```
+
+```{r, fig.width = 8, fig.height=10}
+cowplot::plot_grid(aw.bar, aw.bar.exc , ncol = 1)
+```
+
+```{r}
+stream.weight.rating.df <- loop_cell_rating(bibi.sub, su.df,
+                                   unit.col = "stream_miles",
+                                   su.vec = c("huc8", "huc10", "huc12", "catchment"),
+                                   job = "weighted_rating")
+
+sm.bar <- plot_rating(stream.weight.rating.df, "Weighted by Stream Mile") +
+  facet_wrap(~su, ncol = 1)
+```
+
+```{r}
+stream.weight.rating.exc <- exclude_insufficient(area.weight.rating.df,
+                                               spatial_period, method, su)
+
+sm.bar.exc <- plot_rating(stream.weight.rating.exc,
+                            "Weighted by Stream Mile (Insufficient Excluded)") +
+  facet_wrap(~su, ncol = 1)
+```
+
+```{r, fig.width = 8, fig.height=10}
+cowplot::plot_grid(sm.bar, sm.bar.exc , ncol = 1)
+```
+
+## 4) Random Sample
+
+The percentage of the Chesapeake Bay basin within insufficient samples increases as spatial resolution increases from HUC 8 to Catchment. Removing the percentage of Insufficient, allows the percentages from each spatial resolution to be directly compared. In general, percentage of each rating category were had greater variability for all indices and potential baseline periods within a given spatial resolution (i.e., HUC 8, HUC 10, HUC 12, and Catchment) relative to the previously discussed methods (i.e., No Spatial Resolution, Watershed Mean Score, and Weighted Ratings). 
+```{r, fig.width=8, fig.height=10}
+set.seed(1018) # sample(1:10000, 1)
+rand.samp.rating.df <- loop_sample_ratings(bibi.sub, su.df,
+                            su.vec = c("huc8", "huc10", "huc12", "catchment"),
+                            su.density.quantile = 0.1,
+                            reps = 1,
+                            boot.sample.vec = NA,
+                            spatial.vec,
+                            periods.vec) %>% 
+  mutate(su = factor(su, levels = c("huc8", "huc10", "huc12", "catchment")))
+
+rand.bar <- plot_rating(rand.samp.rating.df,
+                        title = "Random Sample",
+                        y = percentage) +
+  facet_wrap(~su, ncol = 1)
+```
+
+```{r}
+rand.samp.rating.exc <- exclude_insufficient(rand.samp.rating.df,
+                                               spatial_period, su)
+
+rand.bar.exc <- plot_rating(rand.samp.rating.exc,
+                            "Random Sample (Insufficient Excluded)") +
+  facet_wrap(~su, ncol = 1)
+```
+
+```{r, fig.width = 8, fig.height=10}
+cowplot::plot_grid(rand.bar, rand.bar.exc , ncol = 1)
+```
+
+## 5) Bootstrap
+
+The percentage of the Chesapeake Bay basin within insufficient samples increases as spatial resolution increases from HUC 8 to Catchment. Removing the percentage of Insufficient, allows the percentages from each spatial resolution to be directly compared. In general, percentage of each rating category were similar for all indices and potential baseline periods within a given spatial resolution (i.e., HUC 8, HUC 10, HUC 12, and Catchment).
+
+For all Chessie BIBI indices and potential baseline periods, standard deviation from the mean decreases from the HUC 8 to HUC 12 spatial resolution but sharply increases from the HUC 12 resolution to the highest spatial resolution explored in this report, Catchment ( __Figures ## and ##__). In general, standard deviation improvements from the HUC 10 resolution to the HUC 12 resolution were minor (mean difference for 5,000 reps = 0.5%).
+```{r, fig.width=8, fig.height=10}
+set.seed(1018) # sample(1:10000, 1)
+boot.rating.df <- loop_sample_ratings(bibi.sub, su.df,
+                            su.vec = c("huc8", "huc10", "huc12", "catchment"),
+                            su.density.quantile = 0.1,
+                            reps = 5000,
+                            boot.sample.vec = NA,
+                            spatial.vec = c("region", "bioregion"),
+                            periods.vec = c("2000_2008", "2004_2008"))
+  
+
+boot.bar <- plot_rating(boot.rating.df,
+                        title = "Bootstrap",
+                        y = percentage) +
+  facet_wrap(~su, ncol = 1)
+```
+
+```{r}
+boot.rating.exc <- exclude_insufficient(boot.rating.df,
+                                        spatial_period, su, job = "bootstrap")
+
+boot.bar.exc <- plot_rating(boot.rating.exc,
+                            "Bootstrap (Insufficient Excluded)") +
+  facet_wrap(~su, ncol = 1) 
+```
+
+```{r, fig.width = 8, fig.height=10}
+cowplot::plot_grid(boot.bar, boot.bar.exc , ncol = 1)
+```
+
+```{r, fig.width = 15, fig.height=15}
+plot_boot_bar_sd(boot.rating.exc) +
+    facet_wrap(~su + spatial_period, ncol = 4)
+```
+
+```{r, fig.width = 8, fig.height=8}
+plot_sd_lines(boot.rating.exc, "Bootstrap Standard Deviation") +
+  facet_wrap(~spatial_period, ncol = 1)
+```
+
+## 6) Random Forest
+
+Results presented here were copied from a manuscript currently under review [@MaloneyPredictingStreambiologicalpublicationpending]. For more details please review the manuscript (when available).
+
