@@ -1,0 +1,175 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "March 1, 2018"
+output: html_document
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
+```
+
+## Six Rating Methodologies
+
+### 1) No Spatial Aggregation
+
+This is the simplest approach for reporting stream health and contains the most spatial bias. Chessie BIBI ratings are not aggregated by any spatial feature and the method does not account for differences in sample density. The proportions of sample locations classifying as Acceptable, Fair, and Degraded are used to represent overall stream condition in the Chesapeake Bay watershed. 
+
+#### No Spatial Rating Function
+
+The ratings are aggregated by spatial resolution and sampling period (`spatial_period`) and the total number of samples is found within each aggregate (`total`). The data is then further aggregated by index rating (`rating`) and the total number of samples in each aggregate (`total`) to calculate the percentage of samples classified as each rating category. Ratings (`rating`) are converted to factors and assigned specific factor levels that will sort the data appropriately in the subsequent plot.
+```{r}
+no_spatial_rating <- function(bibi.df, su.df) {
+  bibi.df %>% 
+  group_by(spatial_period) %>% 
+  mutate(total = n()) %>% 
+  group_by(spatial_period, rating, total) %>% 
+  summarize(count = n()) %>% 
+  ungroup() %>% 
+  mutate(percentage = count / total * 100) %>% 
+  rating_summarize_pct() %>% 
+  mutate(method = "no_spatial",
+         stream_miles = percentage * sum(su.df$stream_miles, na.rm = TRUE) / 100)
+}
+```
+
+### 2) Watershed Mean Score
+
+The Chessie BIBI scores and ratings are aggregated by a spatial unit (HUC8, HUC10, HUC12, or catchment), the mean Chessie BIBI score is calculated for each unit cell, and each unit cell is assigned a rating based on the mean score. Each rating is then weighted by the number of stream miles in its unit cell and the weighted ratings are summed to represent the number of stream miles classified as Acceptable, Fair, Degraded, and Insufficient in the basin.
+
+#### Mean Cell Rating Function
+
+`mean_cell_rating()` makes it possible to calculate the mean Chessie BIBI score for each spatial unit cell, assign the appropriate Chessie BIBI rating based on the mean score, and summarize the results to represent the proportion of each rating represented in the Chesapeake Bay basin.
+```{r}
+mean_cell_rating <- function(bibi.df, su.col, unit.col) {
+  su.col <- rlang::enquo(su.col)
+  unit.col <- rlang::enquo(unit.col)
+  
+  final.df <-  bibi.df %>% 
+    filter(!is.na(!!unit.col)) %>% 
+    group_by(spatial_period, subspatial, !!su.col,
+             half_ref_10, ref_10, ref_25, ref_50) %>% 
+    summarize(mean_score = mean(final_score),
+              rlang::UQ(rlang::quo_name(unit.col)) := mean(!!unit.col)) %>% 
+    ungroup() %>%  
+    mutate(rating = rate_index_4(., mean_score)) %>% 
+    group_by(spatial_period) %>% 
+    mutate(total = n()) %>% 
+    ungroup() %>% 
+    group_by(spatial_period, rating, total) %>% 
+    summarize(percentage = n() / unique(total) * 100,
+              rlang::UQ(rlang::quo_name(unit.col)) := sum(!!unit.col)) %>% 
+    ungroup() %>% 
+    rating_summarize_pct() %>% 
+    mutate(method = paste(rlang::quo_name(su.col), "mean", sep = "_"),
+           su = rlang::quo_name(su.col))
+  
+  return(final.df)
+}
+```
+
+### 3) Ratings Weighted by Area or Stream Mile
+
+Each Chessie BIBI rating in a spatial unit (e.g., HUC 8, HUC 10, HUC 12, catchment) is weighted by a proportion of the spatial unit’s total area. For a HUC 12 spatial unit, the total area of the HUC 12 is divided by the number of samples it contains. This creates weights of equal sizes for that HUC 12. These weights (sub-areas) are then applied to each sample rating in the unit. The sum of the sub-areas associated with “Acceptable” ratings is divided by the total area of the HUC 12 to obtain the proportion streams that are assumed to be Acceptable in the HUC 12; the sum of the sub-areas with “Fair” ratings is divided by the total area to obtain the proportion of streams that are assumed to be Fair in the HUC 12; and so forth. Sub-areas associated with each rating in the HUC 12s also can be summed up to the Chesapeake watershed scale and divided by the total area of the watershed to obtain estimates of % Acceptable, % Fair, and % Degraded for that scale.
+
+Alternatively, a weighting factor can be calculated by dividing the total stream miles by the number of samples in each unit. This factor—an apportioned number of stream miles—is then applied to each sample’s rating in the unit. The weighted ratings are then summed as above to the desired spatial scale.
+
+#### Weighted Cell Rating Function
+
+`weighted_cell_rating()` makes it possible to calculate the mean Chessie BIBI score for each spatial unit cell, assign the appropriate Chessie BIBI rating based on the mean score, and summarize the results to represent the proportion of each rating represented in the Chesapeake Bay basin.
+```{r}
+#bibi.df <- bibi.cell
+#su.col <- quo(huc12)
+#unit.col <- quo(area)
+weighted_cell_rating <- function(bibi.df, su.col, unit.col) {
+  su.col <- enquo(su.col)
+  unit.col <- enquo(unit.col)
+  
+  final.df <- bibi.df %>% 
+    filter(!is.na(rlang::UQ(unit.col))) %>% 
+    replace_na(list(rating = "Insufficient",
+                    total = 1)) %>% 
+    group_by(spatial_period, !!su.col) %>% 
+    mutate(count = n()) %>% 
+    ungroup() %>%  
+    mutate(weight = (!!unit.col) / count) %>% 
+    group_by(spatial_period, rating, total) %>% 
+    summarize(weight = sum(weight)) %>% 
+    ungroup() %>%
+    mutate(percentage = weight / total * 100) %>% 
+    rating_summarize_pct() %>% 
+    mutate(method = paste(rlang::quo_name(su.col),
+                          rlang::quo_name(unit.col), 
+                          "weighted", sep = "_"),
+           su = rlang::quo_name(su.col)) %>% 
+    rename(rlang::UQ(rlang::quo_name(unit.col)) := weight)
+}
+```
+
+#### Loop Cell Rating Function
+
+`loop_cell_rating()` is essentially a wrapper for `mean_cell_rating()` and `weighted_cell_rating()`. The user can specify the function they want to use (`job = "mean_rating"` or `job = "weighted_rating"`) and a set of two or more spatial unit resolutions (e.g., HUC 8, HUC 10, HUC 12, or catchments). This function will then cycle through each spatial unit resolution performing the specified job and returning a single data frame containing the results from each spatial unit resolution.
+```{r}
+#bibi.df <- bibi.sub
+#unit.col <- "area"
+#su.i <- "huc12"
+#job <- "weighted_rating"
+
+loop_cell_rating <- function(bibi.df, su.df, unit.col, su.vec, job) {
+  unit.col <- rlang::sym(unit.col)
+
+  purrr::map_df(su.vec, function(su.i) {
+    su.i <- rlang::sym(su.i)
+    
+    cell.df <- aggregate_su(su.df, !!su.i, !!unit.col)
+    #--------------------------------------------------------------------------
+    bibi.cell <- bibi.df %>% 
+      full_join(cell.df, by = rlang::quo_name(su.i)) %>% 
+      complete(spatial_period, nesting(!!su.i, !!unit.col, total)) %>% 
+      filter(!is.na(spatial_period))
+    #--------------------------------------------------------------------------
+    if (job == "mean_rating") {
+      final.df <- mean_cell_rating(bibi.cell, !!su.i, !!unit.col)
+    } 
+    
+    if (job == "weighted_rating") {
+      final.df <- weighted_cell_rating(bibi.cell, !!su.i, !!unit.col)
+    } 
+    #--------------------------------------------------------------------------
+    final.df <- final.df %>% 
+      mutate(su = factor(su, levels = su.vec))
+    #--------------------------------------------------------------------------
+    return(final.df)
+  }) %>% 
+    ungroup() %>% 
+  group_by(spatial_period, method) %>% 
+  mutate(total_miles = sum(!!unit.col, na.rm = TRUE))
+}
+
+```
+
+### 4) Random Sample
+
+Chessie BIBI ratings are aggregated by a spatial unit, the number of stream miles in each unit cell is determined, and a random selection of one sampling location in each unit cell is used to represent all stream miles in that cell. The number of stream miles representing each rating is then summed to the desired spatial scale. The initial unit must cover the entire Chesapeake basin, including areas of the basin without Chessie BIBI ratings. Additionally, the cells in the spatial unit should be approximately the same size, giving each cell an equal probability of being selected during sampling.
+
+R-code developed for the [Bootstrap] method was be used to generate the results for the __Random Sample__ method. The bootstrap method was effectively many iterations of the __Random Sample__ method. Therefore, using the bootstrap function `loop_sample_ratings()` with the input variable `reps = 1`, produced the appropriate results.
+
+### 5) Bootstrap
+
+The Chessie BIBI ratings are aggregated by a spatial unit, the total number of stream miles in each unit cell is determined, and bootstrap sampling is applied to each unit cell’s samples. Bootstrap sampling iteratively samples the spatial unit with replacement, choosing one sample from a set number of unit cells in each iteration. The unit must cover the entire basin, including areas of the basin without Chessie BIBI ratings. Additionally, cells in the spatial unit should be approximately the same size, giving each cell an equal probability of being selected during sampling. After many iterations, the bootstrap samples can be summarized to represent the mean number of stream miles associated with each Chessie BIBI rating and provide a standard deviation around each mean.
+
+```{r child = 'bootstrap/bootstrap_functions.Rmd', eval=TRUE}
+
+```
+
+
+### 6) Random Forest
+
+Geospatial predictor variables (e.g., land cover, soil, precipitation, and number of dams) were acquired for the basin. A random forest model was developed to predict Chessie BIBI ratings based on the geospatial predictor variables [@MaloneyPredictingStreambiologicalpublicationpending]. Random forests are an ensemble machine learning technique that incorporates many decision trees to make predictions. The random forest model predicts the Chessie BIBI rating using the geospatial predictor variables for the entire Chesapeake Bay basin, including areas that do not currently contain Chessie BIBI ratings. The underlying data set used for this analysis was the 1:24,000 high resolution Spatial Hydro-Ecological Decision System, SHEDS, database [www.ecosheds.org](www.ecosheds.org). For our initial random forest model, we combined Fair and Acceptable into a single category – FairGood, and built the model to predict either Poor or FairGood conditions.
+
+
+
+
+
+
+
