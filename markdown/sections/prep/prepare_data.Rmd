@@ -1,7 +1,7 @@
 ---
-title: "import"
+title: "Untitled"
 author: "Zachary M. Smith"
-date: "December 26, 2017"
+date: "March 1, 2018"
 output: html_document
 ---
 
@@ -15,18 +15,19 @@ bibi.df <- data.table::fread(file.path(project.dir, "data/raw/scores_ratings.csv
                              colClasses = c(huc_8 = "character",
                                             huc_10 = "character",
                                             huc_12 = "character"),
-                             na.strings = "0na")
+                             na.strings = c("0na", "0NA"))
 ```
 
-Convert the date from a character class to a date class. 
+Convert the date from a character class to a date class.
 ```{r}
 bibi.df <- bibi.df %>% 
   mutate(date = as.Date(date))
 ```
 
-Rename HUC columns so that they are consistant with names from the NHDPlus data set. A leading zero to all HUC columns.
+Rename HUC columns so that they are consistent with names from the NHDPlus data set. A leading zero to all HUC columns.
 ```{r}
 bibi.df <- bibi.df %>% 
+  filter(!is.na(huc_12)) %>% 
   rename(huc12 = huc_12,
          huc10 = huc_10,
          huc8 = huc_8) %>% 
@@ -35,13 +36,13 @@ bibi.df <- bibi.df %>%
          huc8 = paste0("0", huc8))
 ```
 
-Chesapeake Bay Program creates a unique sampling event ID (`event_id`) for each reported sampling event. However, the event does not distinquish between replicates (`sample_number`) collected during the same sampling event. To make it easier to seperate replicates, a unique ID (`unique_id`) is created by concatenating the sampling event ID (`event_id`) with the replicate number (`sample_number`).
+Chesapeake Bay Program creates a unique sampling event ID (`event_id`) for each reported sampling event. However, the event does not distinguish between replicates (`sample_number`) collected during the same sampling event. To make it easier to separate replicates, a unique ID (`unique_id`) is created by concatenating the sampling event ID (`event_id`) with the replicate number (`sample_number`).
 ```{r}
 bibi.df <- bibi.df %>% 
   unite(unique_id, event_id, sample_number, remove = FALSE)
 ```
 
-Convert the region and bioregion classifications (`subspatial`) from class character to class factor. Additionally, change the disturbance gradient classifications (`category`) from class character to class factor. Factors can be assigned `levels` which makes it easier to specify and apply a custom order. The factors will be most helpful when plotting.
+Convert the region and bioregion classifications (`subspatial`) from class character to class factor. Additionally, change the disturbance gradient classifications (`category`) from class character to class factor. Factors can be assigned levels which makes it easier to specify and apply a custom order. The factors will be most helpful when plotting.
 ```{r}
 bibi.df <- bibi.df %>% 
   mutate(subspatial = factor(subspatial, levels = c("inland", "coast",
@@ -52,55 +53,58 @@ bibi.df <- bibi.df %>%
          category = factor(category, levels = c("ref", "min", "mod", "deg", "mix")))
 ```
 
+## Prepare Spatial Units
 
-### Prepare Grids
+### Hydrologic Unit Codes (HUCs)
 
-#### Hydrologic Unit Codes (HUCs)
-
-Hydrologic unit codes (HUCs) 8, 10, and 12 were already present in the Chessie BIBI data. HUC4 (`huc4`) and HUC6 (`huc6`) are extracted from the HUC8 column (`huc8`).
+Hydrologic unit codes (HUCs) 8, 10, and 12 were already present in the Chessie BIBI data. HUC4 (`huc4`) and HUC6 (`huc6`) are extracted from the HUC8 column (`huc8`). Additionally, basin is added to make it easy to aggregate by all of the data in the Chesapeake Bay basin.
 ```{r}
 bibi.df <- bibi.df %>% 
-  mutate(huc4 = str_sub(huc8, 1, 4),
+  mutate(basin = "basin",
+         huc4 = str_sub(huc8, 1, 4),
          huc6 = str_sub(huc8, 1, 6))
 ```
 
+### Catchment
 
-#### Catchment
+Assigning the appropriate catchment is more difficult than assigning lower resolution HUCs. The catchment shapefiles (SHP) must be imported and the catchment that each Chessie BIBI stations falls within must be identified.
 
-Assigning the appropriate catchment is more difficult than assigning lower resolution HUCs.
+The function, `pts_in_poly()`, is created to overlay the Chessie BIBI sampling points (`points.df`) on to the designated  polygons.The coordinate system (`crs`) of the polygons is extracted using `sp::proj4string()`. `points.df` is converted to a spatial point data frame and projected on to the coordinate system of the polygons. `sp::over()` is used to identify the polygon, from polygons, within which each point, in `points.df`, falls. `poly.col` signifies the column in polygons that uniquely identifies each polygon (e.g., catchment, HUC10, or HUC12). `[, poly.col]` at the end of `spp::over()[, poly.col]`, signifies that just this unique identifier should be returned as a vector and not the entire data frame of the polygon. `points.df` is converted back to data frame and the polygon vector (`over.vec`) is added as a column.
 ```{r}
-pts_in_poly <- function(points.df, polygon, poly.col) {
-  crs <- proj4string(polygon)
-
+pts_in_poly <- function(points.df, polygons, poly.col) {
+  crs <- proj4string(polygons)
+  
   coordinates(points.df) <- ~ longitude + latitude
   proj4string(points.df) <- CRS("+init=epsg:4269")
   crs.new <- CRS(crs)
   points.df <- spTransform(points.df, crs.new)
-  over.vec <- sp::over(points.df, polygon)[, poly.col]
+  over.vec <- sp::over(points.df, polygons)[, poly.col]
   points.df <- data.frame(points.df, stringsAsFactors = FALSE)
-  points.df[, poly.col] <- as.integer(over.vec)
- 
- return(points.df)
+  points.df[, poly.col] <- as.character(over.vec)
+  
+  return(points.df)
 }
 ```
 
+The catchment shapefile is imported as a spatial polygon data frame.
 ```{r}
 catchment.poly <- readOGR(file.path(project.dir, "data/gis/NHDPlus/shapefiles/catchment.shp"),
-                      verbose = FALSE)
+                          verbose = FALSE)
 ```
 
+The `pts_in_polygon()` function is applied.
 ```{r}
 bibi.df <- pts_in_poly(bibi.df, catchment.poly, "catchment")
 ```
 
-```{r}
+```{r, include=FALSE}
 rm(catchment.poly)
 ```
 
 
-#### Bioregions
+## Bioregions
 
-Subset the BIBI data frame (`bibi.df`) to only represent unique bioregions (`spatial == "bioregion"`) and unique sampling event IDs (`unique_id`). 
+Subset the BIBI data frame (`bibi.df`) to only represent unique bioregions (`spatial == "bioregion"`) and unique sampling event IDs (`unique_id`).
 ```{r}
 bioregions.df <- bibi.df %>% 
   filter(spatial == "bioregion") %>% 
@@ -115,81 +119,70 @@ bibi.df <- left_join(bibi.df, bioregions.df, by = "unique_id") %>%
   select(spatial, subspatial, bioregion, everything())
 ```
 
-## Count Samples Per Year
 
-This section provides visuals of sample counts per year, which are helpful in defining potential baseline periods.
+## Import Basin-Wide Spatial Unit Data
 
-In subsquent sections the data will be summarized so that each station has one representive sample per the defined baseline sampling period. To count just the potential number of sampling stations (`station_id`), `dplyr::select()` is used to subset the columns to only represent sampling date (`date`), sample aggregation factor(`subspatial`), and station ID (`station_id`). `dplyr::distinct()` is used to remove any duplicate rows. The `bibi.count` data frame will be used to generate the subsequent plots in this section.
+Several spatial unit scales will be evaluated for aggregating Chessie BIBI ratings and ultimately relating ratings to stream miles. The bioregions (`bioregions`) defined by @SmithRefinementBasinWideIndex2017 represent one of the potential spatial units. The remaining spatial units are obtained from NHDPlus V2 Hydrologic Unit Codes (HUCs) and catchments. ArcGIS was used to clip all of the spatial units to represent only the areas in the Chesapeake Bay basin. The Chessie BIBI ratings are not represented in all HUC 8s, HUC 10s, HUC 12s, catchments, or stream segments within the Chesapeake Bay basin. It is important to quantify the proportion of the basin with insufficient samples when evaluating stream condition within the basin. This data frame will be merged with the Chessie BIBI ratings at different spatial resolutions to fill in the missing cells (i.e., HUC 8s, HUC 10s, HUC 12s, catchments, or stream segments) of the spatial unit.
 ```{r}
-bibi.count <- bibi.df %>% 
-  select(date, subspatial, station_id) %>% 
-  distinct()
+su.df <- data.table::fread(file.path(project.dir, "data/spatial_unit_info/stream_network_spatial_unit_master.csv"),
+                           colClasses = c(HUC4 = "character",
+                                          HUC6 = "character",
+                                          HUC8 = "character",
+                                          HUC10 = "character",
+                                          HUC12 = "character",
+                                          catchment = "character",
+                                          COMID = "character")) %>% 
+  clean_up() %>% 
+  rename(stream_segment = comid) %>% 
+  mutate(huc4 = paste0("0", huc4),
+         huc6 = paste0("0", huc6),
+         huc8 = paste0("0", huc8),
+         huc10 = paste0("0", huc10),
+         huc12 = paste0("0", huc12), 
+         basin = "basin")
 ```
 
-
-### Basin
-
-Count the number of sampling events per year. The baseline year, 2008, is colored blue.
-```{r, fig.width = 8, fig.height = 2}
-bibi.count %>% 
-  mutate(year = year(date)) %>% 
-  select(year, station_id) %>% 
-  distinct() %>% 
-  group_by(year) %>% 
-  summarize(count = n()) %>% 
-  ungroup() %>% 
-  mutate(baseline = if_else(year == 2008, TRUE, FALSE)) %>% 
-  ggplot(aes(year, count, fill = baseline)) +
-  scale_fill_manual(values = c("TRUE" = "#0072B2", "FALSE" = "#999999")) +
-  geom_bar(stat = "identity") +
-  guides(fill = FALSE)
+The bioregions created by @SmithRefinementBasinWideIndex2017 are not delineated by watershed features (i.e., HUCs, catchments, or stream segments), and therefore some of the watershed features are intersected by the bioregion boundaries. The intersection results in smaller versions of the original watershed features. For example, the HUC 12, 020700070102, is intersected by three bioregions (SGV, BLUE, and LNP). Each of the bioregions has an independent score and rating for the portion of the HUC 12 that it represents. Maintaining the original HUC 12 will result in multiple ratings for the HUC 12, which could give more weight to intersect HUC 12s vs. un-intersect HUC 12s. Therefore, the bioregion code (`bioregion`) is concatenated with the watershed features (`huc4, huc6, huc8, huc10, huc12, catchment, and stream_segment`) to treat each portion of the divided watershed feature independently.
+```{r}
+su.df <- su.df %>% 
+  filter(!is.na(bioregion)) %>% 
+  mutate(huc4 = paste(bioregion, huc4, sep = "_"),
+         huc6 = paste(bioregion, huc6, sep = "_"),
+         huc8 = paste(bioregion, huc8, sep = "_"),
+         huc10 = paste(bioregion, huc10, sep = "_"),
+         huc12 = paste(bioregion, huc12, sep = "_"),
+         catchment = paste(bioregion, catchment, sep = "_"),
+         stream_segment = paste(bioregion, stream_segment, sep = "_"),
+         bioregion = factor(bioregion, levels = c("inland", "coast",
+                                                  "blue", "ca", "lnp", "mac",
+                                                  "napu", "nca", "nrv", "pied",
+                                                  "sep", "sgv", "srv", "unp")))
 ```
 
-### Region
-
-Split the count the number of sampling events per year by region. The baseline year, 2008, is colored blue.
-```{r, fig.width = 8, fig.height = 2}
-bibi.count %>% 
-  filter(subspatial %in% c("inland", "coast")) %>% 
-  mutate(year = year(date)) %>% 
-  select(-date) %>% 
-  distinct() %>% 
-  group_by(year, subspatial) %>% 
-  summarize(count = n()) %>% 
-  ungroup() %>% 
-  mutate(baseline = if_else(year == 2008, TRUE, FALSE)) %>% 
-  arrange(subspatial) %>% 
-  ggplot(aes(year, count, fill = baseline)) +
-  scale_fill_manual(values = c("TRUE" = "#0072B2", "FALSE" = "#999999")) +
-  geom_bar(stat = "identity") +
-  guides(fill = FALSE) +
-  facet_wrap(~ subspatial, ncol = 2)
+The Chessie BIBI rating data (`bibi.df`) also concatenates the bioregion code (`bioregion`) with the watershed features (`huc4, huc6, huc8, huc10, huc12, and catchment`) to make it possible to merge `bibi.df` with `su.df` in subsequent analyses.
+```{r}
+bibi.df <- bibi.df %>% 
+  mutate(huc4 = paste(bioregion, huc4, sep = "_"),
+         huc6 = paste(bioregion, huc6, sep = "_"),
+         huc8 = paste(bioregion, huc8, sep = "_"),
+         huc10 = paste(bioregion, huc10, sep = "_"),
+         huc12 = paste(bioregion, huc12, sep = "_"),
+         catchment = paste(bioregion, catchment, sep = "_"))
 ```
 
-### Bioregion
+## NEEDS TO BE FIXED
 
-Split the count the number of sampling events per year by bioregion. The baseline year, 2008, is colored blue.
-```{r, fig.width = 8, fig.height = 8}
-bibi.count %>% 
-  filter(!subspatial %in% c("inland", "coast")) %>% 
-  mutate(year = year(date)) %>% 
-  select(-date) %>% 
-  distinct() %>% 
-  group_by(year, subspatial) %>% 
-  summarize(count = n()) %>% 
-  ungroup() %>% 
-  mutate(baseline = if_else(year == 2008, TRUE, FALSE)) %>% 
-  arrange(subspatial) %>% 
-  ggplot(aes(year, count, fill = baseline)) +
-  scale_fill_manual(values = c("TRUE" = "#0072B2", "FALSE" = "#999999")) +
-  geom_bar(stat = "identity") +
-  guides(fill = FALSE) +
-  facet_wrap(~ subspatial, ncol = 2)
+Currently, there are a number of spatial units in bibi.df that do not have a match in `su.df`. Most likely `su.df` needs to be re-run to rectify this issue. However, to prevent any potential issues at this time, these rows will be excluded from `bibi.df`.
+```{r}
+catchment.vec <- unique(bibi.df$catchment)
+catchment.vec <- catchment.vec[!catchment.vec %in% unique(su.df$catchment)]
+bibi.df <- bibi.df %>% 
+  filter(!catchment %in% catchment.vec)
 ```
 
 ## Create Baseline Periods
 
-Create a list of data frames representing two potential time periods (i.e., 2000-2008 or 2004-2008) for establishing the 2008 baseline. The 2000-2008 time period was selected becuase there is a significant increase in the amount of sampling events in the 2000's relative to the 1990's. The 2004-2008 time period is centered around the 2006 National Land Cover Date (NLCD) and was used by Maloney et al. (publication pending).
+Create a list of data frames representing two potential time periods (i.e., 2000-2008 or 2004-2008) for establishing the 2008 baseline. [Appendix C] explored the temporal distribution of samples in the Chessie BIBI database and indicated that there is a substantial amount of data avialable for these time periods. The 2000-2008 time period was selected because there is a significant increase in the amount of sampling events in the 2000's relative to the 1990's. The 2004-2008 time period is centered around the 2006 National Land Cover Date (NLCD) and was used by @MaloneyPredictingStreambiologicalpublicationpending.
 ```{r}
 bibi.list <- list()
 
@@ -202,17 +195,6 @@ bibi.list$bibi.0408 <- bibi.df %>%
   filter(date >= "2004-01-01",
          date < "2009-01-01") %>% 
   mutate(period = "2004_2008")
-
-bibi.list$bibi.0610  <- bibi.df %>% 
-  filter(date >= "2006-01-01",
-         date < "2011-01-01") %>% 
-  mutate(period = "2006_2010")
-
-bibi.list$bibi.0611 <- bibi.df %>% 
-  filter(date >= "2005-01-01",
-         date < "2012-01-01") %>% 
-  mutate(period = "2005_2011")
-
 ```
 
 Join the list of data frames into a single data frame.
@@ -220,21 +202,28 @@ Join the list of data frames into a single data frame.
 bibi.sub <- bind_rows(bibi.list)
 ```
 
+Concatenate the spatial resolution (`spatial`) with the sampling period (`period`) to form a new column `spatial_period`. This column will make it easier to aggregate by spatial resolution and sampling period.
+```{r}
+bibi.sub <- bibi.sub %>% 
+  unite(spatial_period, spatial, period, remove = FALSE)
+```
+
 ## Aggregate Ratings
 
-The Chessie BIBI has five rating categores (i.e., Excellent, Good, Fair, Poor, and Very Poor). However, the Chesapeake Bay Program is only interested in the percentage of Excellent and Good versus Poor and Very Poor. The ratings are reclassified to reflect the Chesapeake Bay Programs needs. "Poor" is used to represent the combination of Poor and Very Poor, while "Attaining" is used to represent Excellent and Good. The Fair category will be used as a gray-zone between the two categories of interest. 
+The Chessie BIBI has five rating categories (i.e., Excellent, Good, Fair, Poor, and Very Poor). However, the Chesapeake Bay Program is only interested in the percentage of Excellent and Good versus Poor and Very Poor. The ratings are reclassified to reflect the Chesapeake Bay Programs needs. "Degraded" is used to represent the combination of Poor and Very Poor, while "Acceptable" is used to represent Excellent and Good. The Fair category will be used as a gray-zone between the two categories of interest. 
 ```{r}
 bibi.sub <- bibi.sub %>% 
   mutate(rating = case_when(
-    rating %in% c("excellent", "good") ~ "attaining",
-    rating %in% c("fair") ~ "fair",
-    rating %in% c("poor", "verypoor") ~ "poor",
+    rating %in% c("excellent", "good") ~ "Acceptable",
+    rating %in% c("fair") ~ "Fair",
+    rating %in% c("poor", "verypoor") ~ "Degraded",
     TRUE ~ "ERROR"
     ))
 ```
 
-Remove unnecessary items from the global environment.
-```{r}
-rm(bibi.list, bibi.count, bioregions.df)
+```{r, include=FALSE}
+rm(bibi.list, bibi.count, count.bar, region.bar, bioregion.bar)
 ```
+
+
 
