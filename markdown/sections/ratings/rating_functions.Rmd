@@ -9,6 +9,8 @@ output: html_document
 knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
 ```
 
+This section describes a set of general methods, and associated functions, used to manipulate, summarize, or plot data for two or more of the rating methodologies.
+
 ## Rating Classification
 
 Several functions are created to apply the appropriate rating to a BIBI score. The Chessie BIBI data (`bibi.df`) already contains the appropriate rating for each sampling event but if the scores are manipulated in any way, such as averaged together by HUC 12 (see [HUC 12 Mean Score]), then modified scores need to be classified with the appropriate rating. Three functions are created to classify the scores at three different resolutions: High (`rate_index_6()`), Medium (`rate_index_4()`), and Low (`rate_index_3()`).
@@ -20,11 +22,11 @@ rate_index_6 <- function(x, score.col) {
   
   x %>% 
     mutate(rating = case_when(
-      (!!score.col)< half_ref_10 ~ "very_poor",
-      (!!score.col)>= half_ref_10 & (!!score.col )< ref_10 ~ "poor",
-      (!!score.col)>= ref_10 & (!!score.col )< ref_25 ~ "fair",
-      (!!score.col)>= ref_25 & (!!score.col )< ref_50 ~ "good",
-      (!!score.col)>= ref_50 ~ "excellent",
+      (!!score.col) < half_ref_10 ~ "very_poor",
+      (!!score.col) >= half_ref_10 & (!!score.col ) < ref_10 ~ "poor",
+      (!!score.col) >= ref_10 & (!!score.col ) < ref_25 ~ "fair",
+      (!!score.col) >= ref_25 & (!!score.col ) < ref_50 ~ "good",
+      (!!score.col) >= ref_50 ~ "excellent",
       is.na(!!score.col) ~ "insufficient",
       TRUE ~ "ERROR"
     )) %>% 
@@ -87,24 +89,25 @@ aggregate_su <- function(su.df, su.col, value.col) {
 
 ## Summarize Rating Percentage
 
-For each rating methodology the ratings need to be summarized to represent the percentage of the basin represented by each rating and prepared for plotting. `rating_summarize_pct()` standardizes this process to simplify the code and reduce the potential for errors. The data frame is aggregated by spatial resolution and sampling period (`spatial_period`). Ratings (`rating`) are converted to factors and assigned specific factor levels that will sort the data appropriately in the subsequent plots. `tidyr::complete()` is used to make sure each rating level ("insufficient", "Degraded", "Fair", and "Acceptable") is represented in the data frame for each `spatial_period`. If there is not data for a given rating level, then it will be added and treated as a percentage of zero(`fill = list(percentage = 0)`). The data is then subset to only include the columns necessary for plotting (`spatial_period`, `rating`, and `percentage`). A final check is done to make sure summing all rating percentages per `spatial_period` add up to 100%. If the ratings do not add up to 100% a warning message is printed.
+For each rating methodology the ratings need to be summarized to represent the percentage of the basin represented by each rating and prepared for plotting. `rating_summarize_pct()` standardizes this process to simplify the code and reduce the potential for errors. The data frame is aggregated by spatial resolution and sampling period (`spatial_period`). Ratings (`rating`) are converted to factors and assigned specific factor levels that will sort the data appropriately in the subsequent plots. `tidyr::complete()` is used to make sure each rating level ("insufficient", "Degraded", "Fair", and "Acceptable") is represented in the data frame for each `spatial_period`. If there is not data for a given rating level, then it will be added and treated as a percentage of zero (`fill = list(percentage = 0)`). The data is then subset to only include the columns necessary for plotting (`spatial_period`, `rating`, and `percentage`). A final check is done to make sure summing all rating percentages per `spatial_period` add up to 100%. If the ratings do not add up to 100% a warning message is printed.
 ```{r}
 rating_summarize_pct <- function(x) {
   final.df <- x %>% 
-  group_by(spatial_period) %>% 
-  mutate(rating = factor(rating, levels = c("Insufficient", "Degraded", "Fair", "Acceptable"))) %>% 
-  complete(rating, fill = list(percentage = 0)) %>% 
-  ungroup() %>% 
-  #select(spatial_period, rating, percentage) %>% 
-  filter(!is.na(percentage))
+    group_by(spatial_period) %>% 
+    mutate(rating = factor(rating, levels = c("Acceptable", "Fair",
+                                              "Degraded", "Insufficient"))) %>% 
+    complete(rating, fill = list(percentage = 0)) %>% 
+    ungroup() %>% 
+    #select(spatial_period, rating, percentage) %>% 
+    filter(!is.na(percentage))
   
   sum.vec <- final.df %>%
-      group_by(spatial_period) %>% 
-      mutate(sum_pct = as.numeric(as.character(sum(percentage)))) %>% 
-      ungroup() %>% 
-      select(sum_pct) %>% 
-      distinct() %>% 
-      pull(sum_pct)
+    group_by(spatial_period) %>% 
+    mutate(sum_pct = as.numeric(as.character(sum(percentage)))) %>% 
+    ungroup() %>% 
+    select(sum_pct) %>% 
+    distinct() %>% 
+    pull(sum_pct)
   if (any(sum.vec != as.double(100))) {
     warning("The percentages for each spatial period do not add up to 100%.")
   }
@@ -113,27 +116,107 @@ rating_summarize_pct <- function(x) {
 }
 ```
 
+## Exclude Insufficient Ratings
+
+Areas of the basin with no samples or below a given sample threshold are categorized as “Insufficient”. It is important to understand the proportion of area insufficiently represented by the sampling method. However, this makes it difficult to compare the estimates of the proportions of the other categories among sampling methods because they are often skewed by differing percentages “Insufficient.”
+
+`exclude_insufficient()` calculates the percentage of the basin represented by all ratings, excluding "insufficient". `x` is a data frame with the percentage (`percentage`) of each rating category summarized by the specified grouping columns to represent the Chesapeake Bay basin. The combination of `...` and `rlang::quos()` allows multiple columns to be specified using NSE syntax and, in this case, used as the grouping variable. Most likely these columns should represent columns `spatial`, `period`, and possibly `bootstrap_sample`. 
+
+Rows where the `rating` represents "insufficient" are removed from the data frame. The grouping columns are used to aggregate the data frame and calculate the sum of the rating percentages after the "insufficient" rows have been removed (`total`). The input variable `job` is only necessary to include when the input data frame (`x`) represents bootstrap results. For bootstrap results, `job = "bootstrap"` will make sure that both the rating percentages (`percentage`) and standard deviation values (`sd`) are recomputed without the "insufficient" category. None of the other methods include standard deviation, and therefore only the rating percentages (`percentage`) are recomputed.
+```{r}
+#spatial, period, bootstrap_sample
+exclude_insufficient <- function(x, ..., job = NULL) {
+  group.vec <- rlang::quos(...)
+  
+  final.df <- x %>% 
+    dplyr::filter(rating != "Insufficient") %>% 
+    dplyr::group_by(!!!group.vec) %>% 
+    dplyr::mutate(total = sum(percentage)) %>% 
+    dplyr::ungroup()
+  
+  if (is.null(job)) {
+    final.df <- final.df %>% 
+      dplyr::group_by(rating, !!!group.vec) %>% 
+      dplyr::summarize(percentage = percentage / total * 100) %>% 
+      dplyr::ungroup()
+  } else if (job  == "bootstrap"){
+    final.df <- final.df %>% 
+      dplyr::group_by(rating, !!!group.vec) %>% 
+      dplyr::summarize(percentage = percentage / total * 100,
+                       sd = sd / total * 100) %>% 
+      dplyr::ungroup()
+  }
+  
+  test.sum <- final.df %>% 
+  dplyr::group_by(!!!group.vec) %>% 
+    dplyr::mutate(test_sum = round(sum(percentage))) %>% 
+    dplyr::ungroup()
+  
+  if (any(test.sum$test_sum != 100)) stop("At least one group of percentages do not add up to 100%.")
+  
+  final.df <- final.df %>% 
+    mutate(rating = factor(rating,
+                           levels = c("Acceptable", "Fair",
+                                      "Degraded", "Insufficient")))
+  return(final.df)
+}
+```
+
 ## Rating Plots
 
-`plot_rating()` standardizes the procedure for plotting the rating bar charts.
+`plot_rating()` standardizes the procedure for plotting the rating stacked bar charts. A data frame (`df`) containing the specified `x` column (default = spatial_period), `y` column (default = percentage), and `group.col` column (default = "su") is supplied. If `group.col = NULL`, then the `group.col` variable is ignored. It is also possible to specify a title for the plot (`title`).
+
+
 ```{r}
-plot_rating <- function(x, title) {
-  x  %>% 
-  arrange(desc(rating)) %>% 
-  ggplot(aes(spatial_period, percentage, fill = rating)) +
-  geom_bar( position = "dodge", stat = "identity") +
-    scale_fill_manual(values = c("Insufficient" = "#999999",
-                                 "Degraded" = "#E69F00", #"#D55E00",
+#df <- filter(mean.rating.df, su == "huc12")
+#x <- quo(spatial_period)
+#y <- quo(percentage)
+#group.col <- sym(NULL)
+
+
+plot_rating <- function(df, title = NULL, x = spatial_period, y = percentage, group.col = "su") {
+  x <- rlang::enquo(x)
+  y <- rlang::enquo(y)
+  if (!rlang::is_empty(group.col)) group.col <- rlang::sym(group.col)
+  
+  prep.df <- df %>% 
+    mutate(bar_label = dplyr::if_else(!!y > 5,
+                                  paste0(round(!!y), "%"), "")) %>% 
+    mutate(rating = factor(rating,
+                           levels = c("Acceptable", "Fair",
+                                      "Degraded", "Insufficient"))) %>% 
+    arrange((rating))
+  #----------------------------------------------------------------------------
+  if (rlang::is_empty(group.col)) {
+    prep.df <- prep.df %>% 
+      group_by(!!x) %>% 
+    mutate(pos = (cumsum(!!y) - (!!y) / 2)) %>% 
+    ungroup() 
+  } else {
+    prep.df <- prep.df %>% 
+      group_by(!!x, !!group.col) %>% 
+    mutate(pos = (cumsum(!!y) - (!!y) / 2)) %>% 
+    ungroup()
+  }
+    #----------------------------------------------------------------------------
+    prep.df %>% 
+    ggplot(aes_string(dplyr::quo_name(x), dplyr::quo_name(y), fill = "rating")) +
+    geom_bar(stat = "identity",
+           position = position_stack(reverse = TRUE),
+           width = 1,
+           color = "black"
+           ) +
+    scale_fill_manual(values = c("Acceptable" = "#56B4E9",#"#009E73",
                                  "Fair" = "#F0E442",
-                                 "Acceptable" = "#56B4E9"#"#009E73"
-                                 ),
+                                 "Degraded" = "#E69F00", #"#D55E00",
+                                 "Insufficient" = "#999999"),
                       name = "Rating") +
-  xlab("Period") +
-  ylab("Percentage") +
-  ggtitle(title)  +
-  theme(plot.title = element_text(hjust = 0.5)) +#,
-        #axis.text.x  = element_text(angle = 330, vjust = 1, hjust = 0))
-  coord_flip()
+    geom_text(aes(label = bar_label, y = pos), size = 3) +
+    xlab("Period") +
+    ylab("Percentage") +
+    ggtitle(title)  +
+    theme(plot.title = element_text(hjust = 0.5)) +
+    coord_flip()
 }
 ```
 

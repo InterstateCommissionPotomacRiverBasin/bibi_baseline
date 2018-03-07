@@ -11,21 +11,70 @@ knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
 
 These functions standardize the bootstrapping process, so that it can be used to evaluate data at different scales and resolutions.
 
-### Nested Data Frame
+#### Spatial Unit Sample Size
 
-The `tidyr::nest()` function groups data by a set of specified columns (each row represents a unique combination of values from the specified columns) and condenses (nests) the remaining columns/rows into a single column as a list. Allow it is difficult to describe, working with a nested data frame seems more intuitive for the task of randomly sampling all ratings representing each grid cell.
-
-`rlang::enquo()` allows for non-standard evaluation of the column name representing the grid resolution (`grid.res`); instead of specifying the column name as `"huc_12"`, the quotations can be dropped and the column name simply represented as `huc_12`. To use __dplyr__ functions within a function, objects must be expressed as _quosures_ (`rlang::enquo()` converts `grid.res` to a _quosure_) and then the expresion `!!` (short hand for `rlang::UQ()`) is used work with the _quosure_ within __dplyr__ functions (visit (https://cran.r-project.org/web/packages/dplyr/vignettes/programming.html)[https://cran.r-project.org/web/packages/dplyr/vignettes/programming.html] for more details.
-
-`dplyr::full_join()` combines all rows and columns from `rating.df` and `grid.df`. `NA` will fill columns/rows where there is no matching cell from the grid column (`grid.res`). Only the necessary columns are retained with `dplyr::select()` and data frame is aggregated by the grid resolution (`grid.res`), sampling period (`period`), and spatial resolution (`spatial`) using `dplyr::group_by()`. The ratings (`rating`) are then nested into a column titled `data` by the groupling columns using `tidyr::nest()`. `dplyr::mutate()` is used to created a number of columns that are useful for summarizing the ratings. `unique` indicates the number of unique ratings in the rating list by row. This is calculated to save time in the `sample_ratings()` function. If there are multiple ratings in a rows `data` list but all of the ratings are the same, then there is no need to randomly sample the list because the result will always be the same.`sel_rating` is created to represent a column of ratings selected to represent each row (grid cell). If `unique == 1`, then the unique rating is provided and no sampling of ratings will occur in the `sample_ratings()` function.If `unique == 1`, then the unique rating is provided and no sampling of ratings will occur in the `sample_ratings()` function. If `unique > 1`, then `NA` is returned to the `sel_rating` column. A second if/else statement (`dplyr::if_else()`) is used to identify rows (grid cells) without any ratings (`unique == 1 & is.na(sel_rating)`) and assign a rating of "insufficient".
+__ADD DESCRIPTION__
 ```{r}
-nest_df <- function(rating.df, grid.df, grid.res) {
-  grid.res <- rlang::enquo(grid.res)
+su_density <- function(rating.df, group.by, su.df, low.res.col, high.res.col,
+                       quantile, total.greater.than = 0) {
+  group.by <- rlang::enquo(group.by)
+  low.res.col <- rlang::enquo(low.res.col)
+  high.res.col <- rlang::enquo(high.res.col)
+  
+  rating.df <- rating.df %>% 
+    group_by(rlang::UQ(group.by)) %>% 
+    select(rlang::UQ(group.by), rlang::UQ(low.res.col), rlang::UQ(high.res.col)) %>% 
+    distinct() %>% 
+    mutate(present = 1)
+  
+  join.df <- su.df %>% 
+    select(rlang::UQ(low.res.col), rlang::UQ(high.res.col)) %>% 
+    distinct() %>% 
+    full_join(rating.df, by = c(rlang::quo_name(low.res.col),
+                                rlang::quo_name(high.res.col))) %>% 
+    rename(low_res = rlang::UQ(low.res.col),
+           high_res = rlang::UQ(high.res.col)) %>% 
+    complete(rlang::UQ(group.by),
+             nesting(low_res, high_res),
+             fill = list(present = 0))
+  
+  pct.df <- join.df %>% 
+    group_by(low_res, rlang::UQ(group.by)) %>% 
+    mutate(total = n()) %>% 
+    filter(total > total.greater.than) %>% 
+    ungroup() %>% 
+    group_by(low_res, rlang::UQ(group.by), total) %>% 
+    summarize(count = sum(present)) %>% 
+    ungroup() %>% 
+    mutate(percent = count / total * 100) %>% 
+    arrange(percent)
+  
+  final.df <- pct.df %>% 
+    group_by(rlang::UQ(group.by)) %>% 
+    summarize(pct_quant = quantile(percent, quantile),
+              total = sum(total)) %>% 
+    ungroup() %>% 
+    mutate(sample_size = round(pct_quant / 100 * total))
+  
+  return(final.df)
+}
+```
+
+#### Nested Data Frame
+
+The `tidyr::nest()` function groups data by a set of specified columns (each row represents a unique combination of values from the specified columns) and condenses (nests) the remaining columns/rows into a single column as a list. Allow it is difficult to describe, working with a nested data frame seems more intuitive for the task of randomly sampling all ratings representing each spatial unit cell.
+
+`rlang::enquo()` allows for non-standard evaluation of the column name representing the spatial resolution (`su.res`); instead of specifying the column name as `"huc_12"`, the quotations can be dropped and the column name simply represented as `huc_12`. To use __dplyr__ functions within a function, objects must be expressed as _quosures_ (`rlang::enquo()` converts `su.res` to a _quosure_) and then the expression `!!` (short hand for `rlang::UQ()`) is used work with the _quosure_ within __dplyr__ functions (visit [https://cran.r-project.org/web/packages/dplyr/vignettes/programming.html](https://cran.r-project.org/web/packages/dplyr/vignettes/programming.html) for more details).
+
+`dplyr::full_join()` combines all rows and columns from `rating.df` and `su.df`. `NA` will fill columns/rows where there is no matching cell from the spatial unit column (`su.res`). Only the necessary columns are retained with `dplyr::select()` and data frame is aggregated by the spatial resolution (`su.res`), sampling period (`period`), and spatial resolution (`spatial`) using `dplyr::group_by()`. The ratings (`rating`) are then nested into a column titled `data` by the grouping columns using `tidyr::nest()`. `dplyr::mutate()` is used to create a number of columns that are useful for summarizing the ratings. `unique` indicates the number of unique ratings in the rating list by row. This is calculated to save time in the `sample_ratings()` function. If there are multiple ratings in a rows `data` list but all of the ratings are the same, then there is no need to randomly sample the list because the result will always be the same.`sel_rating` is created to represent a column of ratings selected to represent each row (spatial unit cell). If `unique == 1`, then the unique rating is provided and no sampling of ratings will occur in the `sample_ratings()` function. If `unique == 1`, then the unique rating is provided and no sampling of ratings will occur in the `sample_ratings()` function. If `unique > 1`, then `NA` is returned to the `sel_rating` column. A second if/else statement (`dplyr::if_else()`) is used to identify rows (spatial unit cells) without any ratings (`unique == 1 & is.na(sel_rating)`) and assign a rating of "Insufficient".
+```{r}
+nest_df <- function(rating.df, su.df, su.res) {
+  su.res <- rlang::enquo(su.res)
   
   test <- rating.df %>% 
-    full_join(grid.df, by = rlang::quo_name(grid.res)) %>% 
-    select(!!grid.res, rating, period, spatial) %>% 
-    group_by(!!grid.res, period, spatial) %>% 
+    full_join(su.df, by = rlang::quo_name(su.res)) %>% 
+    select(!!su.res, rating, spatial_period) %>% 
+    group_by(!!su.res, spatial_period) %>% 
     nest() %>% 
     mutate(#empty = map_lgl(data, function(i) is.na(unique(i))),
       #length = purrr::map(data, function(i) length(unlist(i))),
@@ -38,12 +87,12 @@ nest_df <- function(rating.df, grid.df, grid.res) {
         }
       }),
       sel_rating = if_else(unique == 1 & is.na(sel_rating),
-                           "insufficient",
+                           "Insufficient",
                            as.character(sel_rating)))
 }
 ```
 
-### Sample Ratings
+#### Sample Ratings
 
 This function bootstraps (n = `boot.sample`) the nested data frame (`nest.df`), generated by the `nest_df()` function, for a specified number of iterations (`reps`) and returns a list of the selected ratings from each iteration. `purrr::map()` is used to re-sample the data for the specified number of `reps`. `dplyr::slice()` and `base::sample()` are used to sample the data frame with replacement for the specified sample size (`boot.sample`). If the `sel_rating` column, created by the `nest_df()` function, is `NA`, then one of the ratings listed in the `data` column is randomly selected using `purrr::map_chr()` and `base::sample()`. If the `sel_rating` column is not `NA`, then the reported rating, specified during `nest_df()`, is retained in the `sel_rating` column.
 ```{r}
@@ -61,14 +110,14 @@ sample_ratings <- function(nest.df, reps, boot.sample) {
 }
 ```
 
-### Percentage of Rating Categories
+#### Percentage of Rating Categories
 
-Each bootstrap sample is summarized by finding the percentage of the sample represented by each rating category (i.e., "attaining", "poor", and "insufficient"). `purrr:map()` is used to loop through each bootstrap sample, list element, created with the `sample_ratings()` function. The ratings from each sample are unlisted (`base::unlist()`) and stored in a data frame (`base::data.frame()`) under the column titled `rating`. The ratings (`rating`) are converted from class character to class factor, so that the ratings will be sorted as "attaining", "poor", and "insufficient" in subsequent data frames and plots. `dplyr::group_by()` is used to aggregate the data frame by each unique `rating` and `dplyr::summarize()`is used to calculate the percentage of the sample represented by each rating category. Percentages (`pct`) are calculated by finding the number of ratings in each category, using `dplyr::n()`, divided by the total number of ratings in the sample (`boot.sample`) multiplied by one hundred. `tidyr::complete()` is used to fill in any missing rating category and if empty, assign the `pct` column a value of zero. For example, if no "insufficient" samples were selected during one of the bootstrap samples, then the "insufficient" category does not exist in the data frame. `tidyr::complete()` would add insufficient into the data frame and assign the `pct` column a value of zero.
+Each bootstrap sample is summarized by finding the percentage of the sample represented by each rating category (i.e., "Acceptable", "Fair", "Degraded", and "Insufficient"). `purrr:map()` is used to loop through each bootstrap sample, list element, created with the `sample_ratings()` function. The ratings from each sample are unlisted (`base::unlist()`) and stored in a data frame (`base::data.frame()`) under the column titled `rating`. The ratings (`rating`) are converted from class character to class factor, so that the ratings will be sorted as "Acceptable", "Fair", "Degraded", and "Insufficient" in subsequent data frames and plots. `dplyr::group_by()` is used to aggregate the data frame by each unique `rating` and `dplyr::summarize()`is used to calculate the percentage of the sample represented by each rating category. Percentages (`pct`) are calculated by finding the number of ratings in each category, using `dplyr::n()`, divided by the total number of ratings in the sample (`boot.sample`) multiplied by one hundred. `tidyr::complete()` is used to fill in any missing rating category and if empty, assign the `pct` column a value of zero. For example, if no "Insufficient" samples were selected during one of the bootstrap samples, then the "Insufficient" category does not exist in the data frame. `tidyr::complete()` would add "Insufficient"" into the data frame and assign the `pct` column a value of zero.
 ```{r}
 pct_ratings <- function(ratings.list, boot.sample) {
   purrr::map(1:length(ratings.list), function(list.i) {
     data.frame(rating = unlist(ratings.list[list.i]), stringsAsFactors = FALSE) %>% 
-      mutate(rating = factor(rating, c("attaining", "fair", "poor", "insufficient"))) %>% 
+      mutate(rating = factor(rating, c("Acceptable", "Fair", "Degraded", "Insufficient"))) %>% 
       group_by(rating) %>% 
       summarize(pct = n() / boot.sample * 100) %>% 
       ungroup() %>% 
@@ -79,25 +128,26 @@ pct_ratings <- function(ratings.list, boot.sample) {
 
 ```
 
-### Statistic Summary
+#### Statistic Summary
 
-This function loops through each rating category output from the `pct_ratings()` function and returns a suite of standard statistical metrics provide in the function, `psych::describe()`, including mean, median, standard deviation, standard error, minimum, and maximum. `purrr::map()` is used to loop through and summarize each rating category (represented as elements 1:3 below) with `psych::describe()`. The output of each summary is combined into a data frame using `dplyr::bind_rows()`. Using `dplyr::mutate()`, the ratings (`rating`) are converted from class character to class factor, so that the ratings will be sorted as "attaining", "poor", and "insufficient" in subsequent data frames and plots. Additionally, the bootstrap sample size used during the calculation is reported in a column titled `bootstrap_sample`. 
+This function loops through each rating category output from the `pct_ratings()` function and returns a suite of standard statistical metrics provide in the function, `psych::describe()`, including mean, median, standard deviation, standard error, minimum, and maximum. `purrr::map()` is used to loop through and summarize each rating category (represented as elements 1:3 below) with `psych::describe()`. The output of each summary is combined into a data frame using `dplyr::bind_rows()`. Using `dplyr::mutate()`, the ratings (`rating`) are converted from class character to class factor, so that the ratings will be sorted as "Acceptable", "Fair", "Degraded", and "Insufficient" in subsequent data frames and plots. Additionally, the bootstrap sample size used during the calculation is reported in a column titled `bootstrap_sample`. 
 ```{r}
 stat_ratings <- function(pct.ratings.list, boot.sample) {
   purrr::map(1:4, function(i) {
     purrr::map(pct.ratings.list, i) %>% 
       unlist() %>% 
-      psych::describe()
+      psych::describe() %>% 
+      dplyr::rename(percentage = mean)
   }) %>% 
     bind_rows() %>% 
-    mutate(rating = c("attaining", "fair", "poor", "insufficient"),
-           rating = factor(rating, c("attaining", "fair", "poor", "insufficient")),
+    mutate(rating = c("Acceptable", "Fair", "Degraded", "Insufficient"),
+           rating = factor(rating, c("Acceptable", "Fair", "Degraded", "Insufficient")),
            bootstrap_sample = boot.sample) %>% 
     select(rating, bootstrap_sample, everything(), -vars)
 }
 ```
 
-### Bootstrap Ratings
+#### Bootstrap Ratings
 
 `bootstrap_rating()` wraps `sample_ratings()`, `pct_ratings()`, and `stat_ratings()` to create a single function that performs all of the steps necessary for this analyses bootstrap method.
 ```{r}
@@ -108,65 +158,173 @@ bootstrap_ratings <- function(nest.df, reps, boot.sample) {
 }
 ```
 
-### Multiple Bootstrap Ratings
+#### Multiple Bootstrap Ratings
 
-This study explores the differences in index ratings at multiple index spatial resolutions (i.e. Region and Bioregion) and for a variety of sampling periods. `multi_bootstrap_ratings` uses `purr::map()` to loop through each spatial resolution (`spatial.vec`) and sampling period (`periods.vec`). The filtering to create `bibi.nest.period` may not seem correct at first glance but it is necessary to include `NA`s in these columns. In the `nest_df()` function, the ratings data frame (`rating.df`) is joined with a data frame that represents all of the grid cells (`grid.df`) in the basin (e.g., HUC 12, HUC 8, 1 x 1 $$m^2$$). The join includes all of the cells that do not contain any reported ratings, if these cells exist. Rather than duplicating these empty cells for each element of `spatial.vec` and `periods.vec`, these rows are not assigned a `spatial` or `period` value and are only represented once in data frames with multiple spatial resoltutions and periods.
+This study explores the differences in index ratings at multiple index spatial resolutions (i.e. Region and Bioregion) and for a variety of sampling periods. `multi_bootstrap_ratings` uses `purr::map()` to loop through each spatial resolution (`spatial.vec`) and sampling period (`periods.vec`). The filtering to create `bibi.nest.period` may not seem correct at first glance but it is necessary to include `NA`s in these columns. In the `nest_df()` function, the ratings data frame (`rating.df`) is joined with a data frame that represents all of the spatial unit cells (`su.df`) in the basin (e.g., HUC 12, HUC 8, 1 x 1 $$m^2$$). The join includes all of the cells that do not contain any reported ratings, if these cells exist. Rather than duplicating these empty cells for each element of `spatial.vec` and `periods.vec`, these rows are not assigned a `spatial` or `period` value and are only represented once in data frames with multiple spatial resoltutions and periods.
 The `dplyr::filter()` selects all the rows that represent the specified spatial resolution and period for the current loop, as well as, all of the rows without an assigned spatial resolution or period (indicating that no ratings exist for these cells). 
 
 `bootstrap_ratings()` is used to perform the bootstrap assessment for each specified bootstrap sample size (`boot.sample.vec`), spatial resolution (`saptail.vec`), and sampling period (`periods.vec`). Each of these grouping features is reported in the returned data frame.
 ```{r}
-multi_bootstrap_ratings <- function(nest.df, reps, boot.sample.vec, spatial.vec, periods.vec) {
-  purrr::map_df(spatial.vec, function(spatial.i) {
-    purrr::map_df(periods.vec, function(period.i) {
+multi_bootstrap_ratings <- function(nest.df, reps, boot.sample.vec, spatial.period.vec) {
+  purrr::map_df(spatial.period.vec, function(spatial.period.i) {
+    #purrr::map_df(periods.vec, function(period.i) {
       bibi.nest.period <- nest.df %>% 
-        filter(spatial == spatial.i | is.na(spatial),
-               period == period.i | is.na(period))
+        filter(spatial_period == spatial.period.i | is.na(spatial_period))
       
       purrr::map_df(boot.sample.vec, function(boot.i) {
         bootstrap_ratings(bibi.nest.period, reps, boot.i)
       }) %>% 
         mutate(bootstrap_sample = factor(bootstrap_sample, levels = unique(bootstrap_sample)),
-               period = period.i)
-    }) %>% 
-      mutate(spatial = spatial.i) %>% 
-      select(period, everything())
+               spatial_period = spatial.period.i) #%>% 
+    #}) %>% 
+      #mutate(spatial = spatial.i) %>% 
+      #select(period, everything())
   }) %>% 
-    select(spatial, everything())
+    select(spatial_period, everything())
 }
 ```
 
-#### Exclude Insufficient Ratings
+
+
+#### Loop Sample Ratings
+```{r}
+#df <- bibi.sub
+loop_sample_ratings <- function(boot.df, su.df, su.vec, su.density.quantile,
+                                reps, boot.sample.vec, spatial.vec, periods.vec) {
+  
+  final.df <- purrr::map_df(su.vec, function(su.i) {
+    su.i <- rlang::sym(su.i)
+    #--------------------------------------------------------------------------
+    su.sub <- su.df %>% 
+      select(!!su.i) %>% 
+      distinct()
+    #--------------------------------------------------------------------------
+    total.greater.than <- case_when(
+      rlang::quo_name(su.i) == "huc6" ~ 2,
+      rlang::quo_name(su.i) == "huc8" ~ 2,
+      rlang::quo_name(su.i) == "huc10" ~ 5,
+      rlang::quo_name(su.i) == "huc12" ~ 5,
+      rlang::quo_name(su.i) == "catchment" ~ 20,
+      TRUE ~ 0)
+    #--------------------------------------------------------------------------
+    final.sub <- purrr::map_df(unique(boot.df$spatial_period), function(sp.i) {
+      boot.sub <- boot.df %>% 
+        dplyr::filter(spatial_period == sp.i)
+      
+      boot.density <- su_density(boot.sub, spatial_period, su.df,
+                               bioregion, ###########Bioregion an acceptable low resolution su?????????
+                               !!su.i,
+                               quantile = su.density.quantile,
+                               total.greater.than = total.greater.than) %>% 
+      right_join(boot.sub, by = "spatial_period")
+    #--------------------------------------------------------------------------
+    samp.vec <- boot.density$sample_size %>% 
+      c(boot.sample.vec) %>% 
+      unique() %>% 
+      na.omit() %>% 
+      sort()
+    #--------------------------------------------------------------------------
+    nest.df <- nest_df(boot.density, su.sub, !!su.i) %>% 
+      multi_bootstrap_ratings(reps, samp.vec,
+                              unique(boot.density$spatial_period)) %>% 
+      mutate(su = rlang::quo_name(su.i)) %>% 
+      mutate_if(is.factor, as.character)
+      
+    })
+    
+    #return(final.sub)
+  }) %>% 
+    mutate(su = factor(su, levels = su.vec)) %>% 
+    arrange(su)
+  
+  return(final.df)
+}
+
+```
+
+
+#### Filter Sample Size
+
+`filter_sample_size()`
+```{r}
+filter_sample_size <- function(x, su) {
+  x %>% 
+    filter(bootstrap_sample == sample_size) %>% 
+    mutate(bootstrap_sample = su) %>% 
+    select(bootstrap_sample, everything())
+} 
+```
+
+#### Plotting
+
+##### Bootstrap Bar Plots with Standard Error
 
 ```{r}
-exclude_insufficient <- function(boot.df) {
+plot_boot_bar_sd <- function(boot.df, title = NULL) {
   boot.df %>% 
-  filter(rating != "insufficient") %>% 
-  group_by(spatial, period, bootstrap_sample) %>% 
-  mutate(total = sum(mean)) %>% 
-  ungroup() %>% 
-  group_by(spatial, period, rating, bootstrap_sample) %>% 
-  summarize(mean = mean / total * 100,
-            sd = sd / total * 100)
+  mutate(rating = factor(rating, levels = c("Acceptable", "Fair",
+                                            "Degraded", "Insufficient")),
+         mean_label = factor(paste0(round(percentage), "% ± ", round(sd, 1), "%"))) %>% 
+    #mutate(period = factor(period, levels = periods.vec)) %>% 
+    ggplot(aes(rating, percentage, fill = rating)) +
+    geom_bar(position = "dodge", stat = "identity",
+             color = "black") +
+    scale_fill_manual(values = c("Acceptable" = "#56B4E9",
+                                 "Fair" = "#F0E442",
+                                 "Degraded" = "#E69F00",
+                                 "Insufficient" = "#999999")) +
+    geom_errorbar(aes(ymin = percentage - sd, ymax = percentage + sd),
+                  width = 0.2, # Width of the error bars
+                  size = 0.5,
+                  position = position_dodge(0.9)) +
+  geom_text(aes(label = mean_label, y = -8), vjust = 0, size = 4) +
+    xlab("Number of Bootstrap Samples") +
+    ylab("Mean Percentage") +
+    ggtitle(title)  +
+    theme(plot.title = element_text(hjust = 0.5)) 
+}
+
+```
+
+```{r}
+plot_sd_lines <- function(boot.df, title = NULL) {
+  boot.df %>% 
+  #filter(spatial_period == "region_2000_2008") %>% 
+  mutate(rating = factor(rating, levels = c("Acceptable", "Fair",
+                                            "Degraded", "Insufficient")),
+         su = factor(su, levels = c("huc8", "huc10", "huc12", "catchment"))) %>% 
+    #mutate(period = factor(period, levels = periods.vec)) %>% 
+    ggplot(aes(su, sd, color = rating, group = rating)) +
+  geom_line(size = 2) +
+  #geom_point(size = 4) +
+    scale_color_manual(values = c("Acceptable" = "#56B4E9",
+                                 "Fair" = "#F0E442",
+                                 "Degraded" = "#E69F00",
+                                 "Insufficient" = "#999999")) +
+    xlab("Spatial Resolution") +
+    ylab("Standard Deviation") +
+    ggtitle(title)  +
+  scale_x_discrete(expand = c(0, 0)) +
+    ylim(0, max(boot.df$sd)) +
+    theme(plot.title = element_text(hjust = 0.5))
 }
 ```
 
-### Plotting
 
-
-#### Bootstrap Bar Plots
+##### Bootstrap Bar Plots
 
 `plot_boot_bar()` generates bar plots with standard deviation bars for each rating category by sampling period and spatial resolution. `dplyr::mutate()` is used to convert `period` to class factor and use the order specified in `periods.vec` to sort the data. The bootstrap sample size represents the x-axis and the mean percentage of each rating represents the y-axis. `ggplot2::geom_bar()` is used to create the bars, `ggplot2::scale_fill_manual()` colors the bars appropriately, and `ggplot2::geom_errorbar()` generates the standard deviation bars. `ggplot2::facet_wrap()` is used to create a unique plot for each sampling period (`period`) and spatial resoltuion (`spatial`). 
 ```{r}
 plot_boot_bar <- function(boot.df, periods.vec, title) {
   boot.df %>% 
     mutate(period = factor(period, levels = periods.vec)) %>% 
-    ggplot(aes(bootstrap_sample, mean, fill = rating)) +
+    ggplot(aes(bootstrap_sample, percentage, fill = rating)) +
     geom_bar(position = "dodge", stat = "identity") +
-    scale_fill_manual(values = c("attaining" = "#56B4E9",
-                                 "fair" = "#F0E442",
-                                 "poor" = "#E69F00",
-                                 "insufficient" = "#999999")) +
-    geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),
+    scale_fill_manual(values = c("Acceptable" = "#56B4E9",
+                                 "Fair" = "#F0E442",
+                                 "Degraded" = "#E69F00",
+                                 "Insufficient" = "#999999")) +
+    geom_errorbar(aes(ymin = percentage - sd, ymax = percentage + sd),
                   width = 0.2,                    # Width of the error bars
                   position = position_dodge(0.9)) +
     xlab("Number of Bootstrap Samples") +
@@ -177,7 +335,7 @@ plot_boot_bar <- function(boot.df, periods.vec, title) {
 }
 ```
 
-#### Bootstrap Standard Deviation Plots
+##### Bootstrap Standard Deviation Plots
 
 `plot_boot_sd()` generates line plots of standard deviation of each rating category by the number of bootstrap samples (`bootstrap_sample`). `dplyr::mutate()` is used to convert `period` to class factor and use the order specified in `periods.vec` to sort the data. The bootstrap sample size represents the x-axis and the y-axis is represented by the standard deviation of each rating category. `ggplot2::geom_line()` is used to create the lines and `ggplot2::scale_color_manual()` colors the lines appropriately. `ggplot2::facet_wrap()` is used to create a unique plot for each sampling period (`period`) and spatial resoltuion (`spatial`). 
 ```{r}
@@ -187,10 +345,10 @@ plot_boot_sd <- function(boot.df, periods.vec, title) {
            bootstrap_sample = as.numeric(as.character(bootstrap_sample))) %>% 
     ggplot(aes(bootstrap_sample, sd, color = rating, group = rating)) +
     geom_line(size = 1.5, alpha = 0.75) +
-    scale_color_manual(values = c("attaining" = "#56B4E9",
-                                  "fair" = "#F0E442",
-                                  "poor" = "#E69F00",
-                                  "insufficient" = "#999999")) +
+    scale_color_manual(values = c("Acceptable" = "#56B4E9",
+                                  "Fair" = "#F0E442",
+                                  "Degraded" = "#E69F00",
+                                  "Insufficient" = "#999999")) +
     xlab("Number of Bootstrap Samples") +
     ylab("Standard Deviation") +
     ggtitle(title)  +
@@ -199,36 +357,36 @@ plot_boot_sd <- function(boot.df, periods.vec, title) {
 }
 ```
 
-#### Bootstrap Area Plots
+##### Bootstrap Area Plots
 
 ```{r}
 rating_area_plot <- function(boot.df, title) {
   boot.df %>% 
-  mutate(bootstrap_sample = factor(bootstrap_sample,
-                                   levels = as.numeric(as.character(unique(bootstrap_sample))))) %>%
-  unite(group, spatial, period, bootstrap_sample, remove = FALSE) %>% 
-  arrange(spatial, desc(period), desc(bootstrap_sample)) %>% 
-  mutate(group = factor(group, levels = unique(.$group))) %>% 
-  ggplot(aes(bootstrap_sample, mean, fill = rating, group = rating)) +
-  #geom_bar(stat = "identity") +
-  geom_area() +
-  geom_line(position = "stack") +
-  scale_fill_manual(values = c("attaining" = "#56B4E9",
-                               "fair" = "#F0E442",
-                               "poor" = "#E69F00",
-                               "insufficient" = "#999999")) +
-  scale_y_continuous(expand = c(0, 0)) +
-  scale_x_discrete(expand = c(0, 0)) +
-  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
-        panel.spacing = unit(1, "lines"),
-        plot.title = element_text(hjust = 0.5)) +
-  theme() +
-  xlab("Number of Bootstrap Samples") +
-  ylab("Mean Percentage") +
-  ggtitle(title)  +
-  #coord_flip() +
-  facet_grid(~spatial + period)
-#facet_wrap(~spatial + period, scales = "free", ncol = 1)
+    mutate(bootstrap_sample = factor(bootstrap_sample,
+                                     levels = as.numeric(as.character(unique(bootstrap_sample))))) %>%
+    unite(group, spatial, period, bootstrap_sample, remove = FALSE) %>% 
+    arrange(spatial, desc(period), desc(bootstrap_sample)) %>% 
+    mutate(group = factor(group, levels = unique(.$group))) %>% 
+    ggplot(aes(bootstrap_sample, percentage, fill = rating, group = rating)) +
+    #geom_bar(stat = "identity") +
+    geom_area() +
+    geom_line(position = "stack") +
+    scale_fill_manual(values = c("Acceptable" = "#56B4E9",
+                                 "Fair" = "#F0E442",
+                                 "Degraded" = "#E69F00",
+                                 "Insufficient" = "#999999")) +
+    scale_y_continuous(expand = c(0, 0)) +
+    scale_x_discrete(expand = c(0, 0)) +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),
+          panel.spacing = unit(1, "lines"),
+          plot.title = element_text(hjust = 0.5)) +
+    theme() +
+    xlab("Number of Bootstrap Samples") +
+    ylab("Mean Percentage") +
+    ggtitle(title)  +
+    #coord_flip() +
+    facet_grid(~spatial + period)
+  #facet_wrap(~spatial + period, scales = "free", ncol = 1)
 }
 ```
 

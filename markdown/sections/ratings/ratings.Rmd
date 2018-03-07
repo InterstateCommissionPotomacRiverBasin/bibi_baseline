@@ -10,24 +10,10 @@ output: html_document
 The simplest way to summarize the ratings is to find the percentage of sampling events that are classified as each rating without aggregating the data spatially. The issue with this procedure is the samples are not randomly distributed throughout the basin, and therefore have spatial biases. Additionally, this method provides no way of identifying how much of the basin has been unassessed or has insufficient samples.
 
 
-
-```{r}
-rating.no.spatial <- bibi.sub %>% 
-  group_by(spatial_period) %>% 
-  mutate(total = n()) %>% 
-  group_by(spatial_period, rating, total) %>% 
-  summarize(count = n()) %>% 
-  ungroup() %>% 
-  mutate(percentage = count / total * 100) %>% 
-  rating_summarize_pct() %>% 
-  mutate(method = "no_spatial",
-         stream_miles = percentage * sum(su.df$stream_miles, na.rm = TRUE) / 100)
-```
-
 Plot the data using the function created in [Rating Functions].
 
 ```{r}
-rating.no.spatial2 <- no_spatial_rating(bibi.sub, su.df)
+rating.no.spatial <- no_spatial_rating(bibi.sub, su.df)
 no.spatial.bar <- plot_rating(rating.no.spatial, "Individual Sample Ratings")
 no.spatial.bar
 ```
@@ -48,13 +34,13 @@ mean.rating.df <- mean.rating.df %>%
   ungroup() %>% 
   group_by(spatial_period, method) %>% 
   mutate(total_miles = sum(stream_miles, na.rm = TRUE))
-Plot the data using the function created in [Rating Functions].
-
-mean.bar <- plot_rating(mean.rating.df, "Mean Rating") +
-  facet_wrap(~su, ncol = 1)
 ```
 
+Plot the data using the function created in [Rating Functions].
 ```{r}
+mean.bar <- plot_rating(mean.rating.df, "Mean Rating") +
+  facet_wrap(~su, ncol = 1)
+
 mean.bar
 ```
 
