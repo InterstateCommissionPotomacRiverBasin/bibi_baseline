@@ -1,0 +1,15 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r child = 'master.Rmd', eval=TRUE}
+
+```
+
+```{r child = 'sections/appendix/appendix_master.Rmd', eval=TRUE}
+
+```
+
