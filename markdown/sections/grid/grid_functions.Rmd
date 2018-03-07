@@ -1,0 +1,70 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "January 10, 2018"
+output: html_document
+---
+
+```{r}
+
+rating.df <- bibi.sub
+group.by <- rlang::quo(spatial_period)
+low.res.col <- rlang::quo(huc8)
+high.res.col <- rlang::quo(huc12)
+quantile <- 0.1
+total.greater.than = 0
+```
+
+spatial unit (SU)
+```{r}
+su_density <- function(rating.df, group.by, su.df, low.res.col, high.res.col,
+                         quantile, total.greater.than = 0) {
+  group.by <- rlang::enquo(group.by)
+  low.res.col <- rlang::enquo(low.res.col)
+  high.res.col <- rlang::enquo(high.res.col)
+  
+  rating.df <- rating.df %>% 
+    group_by(rlang::UQ(group.by)) %>% 
+    select(rlang::UQ(group.by), rlang::UQ(low.res.col), rlang::UQ(high.res.col)) %>% 
+    distinct() %>% 
+    mutate(present = 1)
+  
+  join.df <- su.df %>% 
+    select(rlang::UQ(low.res.col), rlang::UQ(high.res.col)) %>% 
+    distinct() %>% 
+    full_join(rating.df, by = c(rlang::quo_name(rlang::UQ(low.res.col)),
+                                rlang::quo_name(rlang::UQ(high.res.col)))) %>% 
+    rename(low_res = rlang::UQ(low.res.col),
+           high_res = rlang::UQ(high.res.col)) %>% 
+    complete(rlang::UQ(group.by),
+             nesting(low_res, high_res),
+             fill = list(present = 0))
+  
+  pct.df <- join.df %>% 
+    group_by(low_res, rlang::UQ(group.by)) %>% 
+    mutate(total = n()) %>% 
+    filter(total > total.greater.than) %>% 
+    ungroup() %>% 
+    group_by(low_res, rlang::UQ(group.by), total) %>% 
+    summarize(count = sum(present)) %>% 
+    ungroup() %>% 
+    mutate(percent = count / total * 100) %>% 
+    arrange(percent)
+  
+  final.df<- pct.df %>% 
+    group_by(rlang::UQ(group.by)) %>% 
+    summarize(sample_size = quantile(percent, quantile))
+  
+  return(final.df)
+}
+```
+
+
+
+```{r}
+test <- su_density(bibi.sub, spatial_period, su.df, huc8, huc12,
+                     quantile = 0.1,
+                     total.greater.than = 5) %>% 
+  right_join(bibi.sub, by = "spatial_period")
+```
+
