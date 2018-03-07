@@ -1,0 +1,45 @@
+---
+title: "Appendix"
+author: "Zachary M. Smith"
+output:
+  html_document:
+    df_print: paged
+    toc: yes
+    toc_depth: '6'
+    toc_float: yes
+  word_document:
+bibliography: citations.bib
+link-citations: true
+---
+```{r, echo=FALSE, cache=FALSE}
+evaluate <- TRUE
+cache.me <- TRUE
+cache.dir <- file.path(rprojroot::find_rstudio_root_file(), "sections/cache/")
+run.cedr.acquisition <- FALSE
+```
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(cache.path=cache.dir)
+```
+
+# Appendix A
+
+```{r child = 'appendicies/appendix_a_methods_r.Rmd', eval=TRUE}
+
+```
+
+# Appendix B
+
+```{r Data Acquisition, child = 'appendicies/appendix_b_data_acquisition_cedr.Rmd', eval=FALSE}
+
+```
+
+# Appendix C
+```{r child = 'appendicies/appendix_c_sample_counts.Rmd', eval=TRUE}
+
+```
+
+```{r}
+getwd()
+```
+
