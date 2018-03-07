@@ -1,0 +1,162 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "January 9, 2018"
+output: html_document
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me, cache.path=cache.dir)
+```
+
+This section provides visuals of sample counts per year, which are helpful in defining potential baseline periods.
+
+In subsequent sections the data will be summarized so that each station has one representative sample per the defined baseline sampling period. To count just the potential number of sampling stations (`station_id`), `dplyr::select()` is used to subset the columns to only represent sampling date (`date`), sample aggregation factor(`subspatial`), and station ID (`station_id`). `dplyr::distinct()` is used to remove any duplicate rows. The `bibi.count` data frame will be used to generate the subsequent plots in this section.
+```{r}
+bibi.count <- bibi.df %>% 
+  select(date, subspatial, station_id) %>% 
+  distinct()
+```
+
+### Basin
+
+Count the number of sampling events per year. The baseline year, 2008, is colored blue.
+```{r, fig.width = 8, fig.height = 2}
+count.bar <- bibi.count %>% 
+  mutate(year = year(date)) %>% 
+  select(year, station_id) %>% 
+  distinct() %>% 
+  group_by(year) %>% 
+  summarize(count = n()) %>% 
+  ungroup() %>% 
+  mutate(baseline = if_else(year == 2008, TRUE, FALSE)) %>% 
+  ggplot(aes(year, count, fill = baseline)) +
+  scale_fill_manual(values = c("TRUE" = "#0072B2", "FALSE" = "#999999")) +
+  geom_bar(stat = "identity") +
+  guides(fill = FALSE) +
+  xlab("Year") +
+  ylab("Count")
+
+count.bar
+```
+
+```{r, include=FALSE}
+ggsave("count_bar.png",
+       count.bar,
+       path = file.path(rprojroot::find_rstudio_root_file(), "markdown/presentation/figures"),
+       width = 8,
+       height = 2)
+```
+
+### Region
+
+Split the count the number of sampling events per year by region. The baseline year, 2008, is colored blue.
+```{r, fig.width = 8, fig.height = 2}
+region.bar <- bibi.count %>% 
+  filter(subspatial %in% c("inland", "coast")) %>% 
+  mutate(year = year(date)) %>% 
+  select(-date) %>% 
+  distinct() %>% 
+  group_by(year, subspatial) %>% 
+  summarize(count = n()) %>% 
+  ungroup() %>% 
+  mutate(baseline = if_else(year == 2008, TRUE, FALSE)) %>% 
+  arrange(subspatial) %>% 
+  ggplot(aes(year, count, fill = baseline)) +
+  scale_fill_manual(values = c("TRUE" = "#0072B2", "FALSE" = "#999999")) +
+  geom_bar(stat = "identity") +
+  guides(fill = FALSE) +
+  facet_wrap(~ subspatial, ncol = 2) +
+  xlab("Year") +
+  ylab("Count")
+
+region.bar
+```
+
+```{r, include=FALSE}
+ggsave("count_region_bar.png",
+       region.bar,
+       path = file.path(rprojroot::find_rstudio_root_file(), "markdown/presentation/figures"),
+       width = 8,
+       height = 2)
+```
+
+### Bioregion
+
+Split the count the number of sampling events per year by bioregion. The baseline year, 2008, is colored blue.
+```{r, fig.width = 8, fig.height = 8}
+bioregion.bar <- bibi.count %>% 
+  filter(!subspatial %in% c("inland", "coast")) %>% 
+  mutate(year = year(date)) %>% 
+  select(-date) %>% 
+  distinct() %>% 
+  group_by(year, subspatial) %>% 
+  summarize(count = n()) %>% 
+  ungroup() %>% 
+  mutate(baseline = if_else(year == 2008, TRUE, FALSE)) %>% 
+  arrange(subspatial) %>% 
+  ggplot(aes(year, count, fill = baseline)) +
+  scale_fill_manual(values = c("TRUE" = "#0072B2", "FALSE" = "#999999")) +
+  geom_bar(stat = "identity") +
+  guides(fill = FALSE) +
+  facet_wrap(~ subspatial, ncol = 2) +
+  xlab("Year") +
+  ylab("Count")
+
+bioregion.bar
+```
+
+```{r, include=FALSE}
+ggsave("count_bioregion_bar.png",
+       bioregion.bar,
+       path = file.path(rprojroot::find_rstudio_root_file(), "markdown/presentation/figures"),
+       width = 8,
+       height = 8)
+```
+
+## Create Baseline Periods
+
+Create a list of data frames representing two potential time periods (i.e., 2000-2008 or 2004-2008) for establishing the 2008 baseline. The 2000-2008 time period was selected because there is a significant increase in the amount of sampling events in the 2000's relative to the 1990's. The 2004-2008 time period is centered around the 2006 National Land Cover Date (NLCD) and was used by @MaloneyPredictingStreambiologicalpublicationpending.
+```{r}
+bibi.list <- list()
+
+bibi.list$bibi.0008 <- bibi.df %>% 
+  filter(date >= "2000-01-01",
+         date < "2009-01-01") %>% 
+  mutate(period = "2000_2008")
+
+bibi.list$bibi.0408 <- bibi.df %>% 
+  filter(date >= "2004-01-01",
+         date < "2009-01-01") %>% 
+  mutate(period = "2004_2008")
+```
+
+Join the list of data frames into a single data frame.
+```{r}
+bibi.sub <- bind_rows(bibi.list)
+```
+
+Concatenate the spatial resolution (`spatial`) with the sampling period (`period`) to form a new column `spatial_period`. This column will make it easier to aggregate by spatial resolution and sampling period.
+```{r}
+bibi.sub <- bibi.sub %>% 
+  unite(spatial_period, spatial, period, remove = FALSE)
+```
+
+## Aggregate Ratings
+
+The Chessie BIBI has five rating categories (i.e., Excellent, Good, Fair, Poor, and Very Poor). However, the Chesapeake Bay Program is only interested in the percentage of Excellent and Good versus Poor and Very Poor. The ratings are reclassified to reflect the Chesapeake Bay Programs needs. "Degraded" is used to represent the combination of Poor and Very Poor, while "Acceptable" is used to represent Excellent and Good. The Fair category will be used as a gray-zone between the two categories of interest. 
+```{r}
+bibi.sub <- bibi.sub %>% 
+  mutate(rating = case_when(
+    rating %in% c("excellent", "good") ~ "Acceptable",
+    rating %in% c("fair") ~ "Fair",
+    rating %in% c("poor", "verypoor") ~ "Degraded",
+    TRUE ~ "ERROR"
+    ))
+```
+
+```{r, include=FALSE}
+rm(bibi.list, bibi.count, count.bar, region.bar, bioregion.bar)
+```
+
+
