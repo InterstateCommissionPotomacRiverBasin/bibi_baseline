@@ -1,0 +1,33 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "March 13, 2018"
+output: ioslides_presentation
+---
+
+## Random Forest {.smaller}
+
+__Process__
+
+1. Chessie BIBI ratings are aggregated by catchment
+    + 1:24,000 high resolution [SHEDS](www.ecosheds.org)
+2. A random forest model was developed to predict Chessie BIBI ratings based on the geospatial predictor variables (e.g., land cover, soil, precipitation, and number of dams)
+3. Using the model predict across the entire Chesapeake Bay basin if an area represents FairGood, Poor, or Uncertain
+
+## Random Forest
+
+```{r, fig.width=6, fig.height=6, fig.show='hold', fig.align='center'}
+imager::load.image(file.path(project.dir, "markdown/presentation/figures/results/random_forest/rf_prediction_uncertain.jpg")) %>% 
+  plot(axes = F)
+```
+
+## Random Forest
+
+__Discussion__
+
+## Random Forest
+
+```{r, fig.width=6, fig.height=6, fig.show='hold', fig.align='center'}
+imager::load.image(file.path(project.dir, "markdown/presentation/figures/results/random_forest/rf_prediction_uncertain.jpg")) %>% 
+  plot(axes = F)
+```

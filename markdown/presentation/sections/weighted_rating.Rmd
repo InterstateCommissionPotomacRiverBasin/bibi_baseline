@@ -1,0 +1,43 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "March 13, 2018"
+output: ioslides_presentation
+---
+
+## Ratings Weighted by Stream Mile {.smaller}
+
+__Process__
+
+1. Chessie BIBI samples are aggregated by a spatial unit (HUC8, HUC10, HUC12, or catchment)
+    + What is an appropriate number of samples to accurately represent a spatial unit cell?
+    + Any spatial unit cells without the appropriate number samples are classified as "Insufficient"
+2. Find the number of stream miles represented in each spatial unit cell
+3. Divide the number of stream miles in a spatial unit cell by the number of Chessie BIBI samples reported in the cell
+4. Use the divided stream miles as a weighting factor for each Chessie BIBI rating
+5. Summarize the proportion of stream miles representing Acceptable, Fair, Degraded, and Insufficient at the Chesapeake Bay basin level 
+
+## Ratings Weighted by Stream Mile {.flexbox .vcenter}
+
+<img src="D:/ZSmith/Projects/Chessie_BIBI/bibi_baseline/bibi_baseline/markdown/presentation/images/stacked_bar/stacked_weighted_insufficient.png" height="500" width="700">
+
+## Ratings Weighted by Stream Mile {.flexbox .vcenter}
+
+<img src="D:/ZSmith/Projects/Chessie_BIBI/bibi_baseline/bibi_baseline/markdown/presentation/images/stacked_bar/stacked_weighted.png" height="500" width="700">
+
+## Ratings Weighted by Stream Mile
+
+__Dissucsion__
+
+## Ratings Weighted by Stream Mile {.flexbox .vcenter}
+
+<img src="D:/ZSmith/Projects/Chessie_BIBI/bibi_baseline/bibi_baseline/markdown/presentation/images/workshop_images/weighted.jpg" height="300" width="700">
+
+## Ratings Weighted by Stream Mile {.flexbox .vcenter}
+
+<img src="D:/ZSmith/Projects/Chessie_BIBI/bibi_baseline/bibi_baseline/markdown/presentation/images/workshop_images/weighted_issue1.jpg" height="300" width="700">
+
+## Ratings Weighted by Stream Mile {.flexbox .vcenter}
+
+<img src="D:/ZSmith/Projects/Chessie_BIBI/bibi_baseline/bibi_baseline/markdown/presentation/images/workshop_images/weighted_issue2.jpg" height="300" width="700">
+

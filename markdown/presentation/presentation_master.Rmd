@@ -1,8 +1,9 @@
 ---
-title: "Untitled"
+title: "Calculating and Mapping Stream Biological Health"
 author: "Zachary M. Smith"
-date: "February 26, 2018"
+date: "April 5, 2018"
 output: ioslides_presentation
+css: styles.css
 ---
 
 ```{r setup, include=FALSE}
@@ -11,62 +12,60 @@ library(tidyverse)
 project.dir <- rprojroot::find_rstudio_root_file()
 ```
 
+## Issues to Keep in Mind {.smaller}
+
+* How to equate a Chessie BIBI rating to stream miles
+    + One sampling event equals X amount of miles?
+    + Aggregate by a spatial unit (e.g., HUC 12) and use sampling events within a spatial unit cell to represent all stream miles within that spatial unit cell?
+* Spatial Influence
+    + Sampling density and frequency (Sampling Rounds)
+    + The amalgamation of two or more random sampling designs does __NOT__ equate to a single random sampling design
+    + Stream access, generally, leads to a larger proportion of streams sampled in urban areas
+* Temporal Influence
+    + Sampling density and frequency (Sampling Rounds)
+    + 2000-2008 vs. 2004-2008 baseline periods (Other Suggestions?)
+* Index Resolution
+    + Region indices vs. Bioregion indices
+    
 ## Six Methods
 
 1. No Spatial Aggregation
-2. Waterhsed Mean Score
-3. Ratings Weighted by Area or Stream Mile
+2. Watershed Mean Score
+3. Ratings Weighted by Stream Mile
 4. Random Sample
 5. Bootstrap
 6. Random Forest
 
-## No Spatial Aggregation
 
-```{r, fig.width=9, fig.height=6, fig.show='hold', fig.align='center'}
-imager::load.image(file.path(project.dir, "markdown/presentation/figures/results/no_spatial/no_spatial_bar.png")) %>% 
-  plot(axes = F)
+```{r child = 'sections/no_spatial.Rmd', eval=TRUE}
+
 ```
 
-## Cell Mean Score
+```{r child = 'sections/watershed_mean_score.Rmd', eval=TRUE}
 
-```{r, fig.width=9, fig.height=7, fig.show='hold', fig.align='center'}
-imager::load.image(file.path(project.dir,
-                             "markdown/presentation/figures/results/mean/mean_bar.png")) %>% 
-  plot(axes = F)
 ```
 
-## Weighted Ratings
+```{r child = 'sections/weighted_rating.Rmd', eval=TRUE}
 
-```{r, fig.width=9, fig.height=6, fig.show='hold', fig.align='center'}
-imager::load.image(file.path(project.dir, "markdown/presentation/figures/results/area_weighted/area_weighted_bar.png")) %>% 
-  plot(axes = F)
 ```
 
-## Weighted Ratings
+```{r child = 'sections/random_sample.Rmd', eval=TRUE}
 
-```{r, fig.width=9, fig.height=6, fig.show='hold', fig.align='center'}
-imager::load.image(file.path(project.dir, "markdown/presentation/figures/results/area_weighted/stream_weighted_bar.png")) %>% 
-  plot(axes = F)
 ```
 
-## Random Sample
+```{r child = 'sections/bootstrap.Rmd', eval=TRUE}
 
-```{r, fig.width=9, fig.height=6, fig.show='hold', fig.align='center'}
-imager::load.image(file.path(project.dir,
-                             "markdown/presentation/figures/results/random/random_bar.png")) %>% 
-  plot(axes = F)
 ```
 
-## Bootstrap
+```{r child = 'sections/random_forest.Rmd', eval=TRUE}
 
-```{r, fig.width=9, fig.height=6, fig.show='hold', fig.align='center'}
-imager::load.image(file.path(project.dir, "markdown/presentation/figures/results/no_spatial/no_spatial_bar.png")) %>% 
-  plot(axes = F)
 ```
 
-## Random Forest
+---- {.flexbox .vcenter}
 
-```{r, fig.width=6, fig.height=6, fig.show='hold', fig.align='center'}
-imager::load.image(file.path(project.dir, "markdown/presentation/figures/results/random_forest/rf_prediction_uncertain.jpg")) %>% 
-  plot(axes = F)
-```
+
+__Break for Lunch__
+
+__12:00-1:00__
+
+

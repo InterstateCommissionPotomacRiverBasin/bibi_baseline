@@ -1,0 +1,37 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "March 13, 2018"
+output: ioslides_presentation
+---
+
+## No Spatial Aggregation
+
+__Process__
+
+1. The proportion of Acceptable, Fair, and Degraded sampling events found in the basin
+
+## No Spatial Aggregation {.flexbox .vcenter}
+
+<img src="D:/ZSmith/Projects/Chessie_BIBI/bibi_baseline/bibi_baseline/markdown/presentation/images/stacked_bar/stacked_no_spatial.png" height="500" width="700">
+
+## No Spatial Aggregation {.smaller}
+
+__Discussion__
+
+* Simplest approach ([CBP Method](http://www.chesapeakeprogress.com/abundant-life/stream-health))
+* Spatial bias
+    + Frequency and density of samples
+* How to convert to stream mile units?
+    + Should each point represent one stream mile? 
+    + Should stream order influence the number of stream miles represented by a point? 
+    + If the data is mapped, should the representative stream miles be drawn above the sampling point or be split by the sampling point? 
+        + What if two or more points have overlapping representative stream miles?
+
+## No Spatial Aggregation {.flexbox .vcenter}
+
+<img src="D:/ZSmith/Projects/Chessie_BIBI/bibi_baseline/bibi_baseline/markdown/presentation/images/workshop_images/stream_miles.jpg" height="400" width="700">
+
+## No Spatial Aggregation {.flexbox .vcenter}
+
+<img src="D:/ZSmith/Projects/Chessie_BIBI/bibi_baseline/bibi_baseline/markdown/presentation/images/workshop_images/stream_miles_issues.jpg" height="300" width="700">

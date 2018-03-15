@@ -1,0 +1,33 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "March 13, 2018"
+output: ioslides_presentation
+---
+
+## Random Sample {.smaller}
+
+__Process__
+
+1. Chessie BIBI scores are aggregated by a spatial unit (HUC8, HUC10, HUC12, or catchment)
+    + Any spatial unit cells without the appropriate number samples are classified as "Insufficient"
+2. A random sample with replacement of spatial units
+3. Find the number of stream miles represented in each spatial unit cell
+4. The spatial unit cell rating is weighted by the number of stream miles
+5. Summarize the proportion of stream miles representing Acceptable, Fair, Degraded, and Insufficient at the Chesapeake Bay basin level
+
+## Random Sample {.flexbox .vcenter}
+
+<img src="D:/ZSmith/Projects/Chessie_BIBI/bibi_baseline/bibi_baseline/markdown/presentation/images/stacked_bar/stacked_random_sample_insufficient.png" height="500" width="700">
+
+## Random Sample {.flexbox .vcenter}
+
+<img src="D:/ZSmith/Projects/Chessie_BIBI/bibi_baseline/bibi_baseline/markdown/presentation/images/stacked_bar/stacked_random_sample.png" height="500" width="700">
+
+## Random Sample
+
+__Discussion__
+
+## Random Sample {.flexbox .vcenter}
+
+<img src="D:/ZSmith/Projects/Chessie_BIBI/bibi_baseline/bibi_baseline/markdown/presentation/images/workshop_images/random_issue.jpg" height="500" width="700">

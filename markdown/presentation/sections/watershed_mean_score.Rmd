@@ -1,0 +1,35 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "March 13, 2018"
+output: ioslides_presentation
+---
+
+## Watershed Mean Score {.smaller}
+
+__Process__
+
+1. Chessie BIBI scores are aggregated by a spatial unit (HUC8, HUC10, HUC12, or catchment)
+    + What is an appropriate number of samples to accurately represent a spatial unit cell?
+    + Any spatial unit cells without the appropriate number samples are classified as "Insufficient"
+2. The mean Chessie BIBI score is calculated for each spatial unit cell
+3. Each spatial unit cell is assigned a rating based on the mean score
+4. Find the number of stream miles represented in each spatial unit cell
+5. The spatial unit cell rating is weighted by the number of stream miles
+6. Summarize the proportion of stream miles representing Acceptable, Fair, Degraded, and Insufficient at the Chesapeake Bay basin level
+
+## Watershed Mean Score {.flexbox .vcenter}
+
+<img src="D:/ZSmith/Projects/Chessie_BIBI/bibi_baseline/bibi_baseline/markdown/presentation/images/stacked_bar/stacked_mean_insufficient.png" height="500" width="700">
+
+## Watershed Mean Score {.flexbox .vcenter}
+
+<img src="D:/ZSmith/Projects/Chessie_BIBI/bibi_baseline/bibi_baseline/markdown/presentation/images/stacked_bar/stacked_mean.png" height="500" width="700">
+
+## Watershed Mean Score
+
+__Discussion__
+
+## Watershed Mean Score {.flexbox .vcenter}
+
+<img src="D:/ZSmith/Projects/Chessie_BIBI/bibi_baseline/bibi_baseline/markdown/presentation/images/workshop_images/mean_issue.jpg" height="300" width="700">
