@@ -1,0 +1,236 @@
+---
+title: "Untitled"
+author: "Zachary M. Smith"
+date: "March 9, 2018"
+output: html_document
+---
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
+```
+
+## Assign Periods
+
+Assign sampling periods of interest using `assign_periods()` ([Assign Sampling Periods]). This example, is centered aroun the potential 2008 baseline period represented by 2004-2008, a five year period. The remaining sampling periods are five year periods that can be formed with the current temporal range of the Chessie BIBI database.
+```{r}
+periods.vec <- c("1994_1998", "1999_2003", "2004_2008", "2009_2013")
+bibi.periods <- assign_periods(bibi.df, periods.vec)
+```
+
+## Stacked Spatial Function
+
+```{r}
+spatial_stacked <- function(x) {
+  x %>% 
+    mutate(bioregion = str_replace(huc12, "_.*", "")) %>% 
+  group_by(spatial_period, bioregion, rating, total) %>% 
+  summarize(stream_miles = sum(stream_miles)) %>% 
+  group_by(spatial_period) %>% 
+  filter(rating != "Insufficient") %>% 
+  mutate(total = sum(stream_miles)) %>% 
+  group_by(spatial_period, bioregion) %>% 
+  mutate(bioregion_total = sum(stream_miles),
+         bioregion_percentage = stream_miles / bioregion_total * 100,
+         basin_percentage = stream_miles / total * 100) %>% 
+  ungroup() %>% 
+    group_by(spatial_period, bioregion) %>% 
+  summarize(percent = sum(basin_percentage)) %>% 
+  ungroup() %>% 
+  separate(spatial_period, c("spatial", "period1", "period2"), remove = FALSE) %>%
+  unite(period, period1, period2) %>% 
+  mutate(period = factor(period, levels = rev(periods.vec))) %>% 
+  arrange(period) %>% 
+  filter(spatial == "bioregion") %>% 
+  ggplot(aes(period, percent, fill = bioregion)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = viridis::viridis_pal(option = "D")(12)) +
+  coord_flip() +
+    ylab("Percentage (%)") +
+    xlab("Period")
+}
+```
+
+
+
+## 1) No Spatial Aggregation
+
+```{r, fig.width = 8, fig.height=5}
+rating.no.spatial <- no_spatial_rating(bibi.periods, su.df) %>% 
+  arrange(spatial_period) %>% 
+  mutate(spatial_period = factor(spatial_period, levels = rev(unique(spatial_period)))) %>% 
+  arrange(spatial_period)
+
+no.spatial.bar <- plot_rating(rating.no.spatial, "Individual Sample Ratings", group.col = NULL)
+
+no.spatial.bar
+```
+
+```{r, fig.width = 8, fig.height=10}
+
+subspatial.df <- bibi.periods %>% 
+  group_by(spatial_period, spatial, subspatial) %>% 
+  summarize(count = n()) %>% 
+  group_by(spatial_period) %>% 
+  mutate(total = sum(count),
+         percent = count / total * 100)
+
+bio.plot <- subspatial.df %>% 
+  filter(spatial == "bioregion") %>% 
+  ggplot(aes(spatial_period, percent, fill = subspatial)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = viridis::viridis_pal(option = "D")(12)) +
+  coord_flip() +
+  facet_wrap(~spatial,
+             scales = "free",
+             nrow = 2)
+
+region.plot <- subspatial.df %>% 
+  filter(spatial == "region") %>% 
+  ggplot(aes(spatial_period, percent, fill = subspatial)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = viridis::viridis_pal(option = "D")(2)) +
+  coord_flip() +
+  facet_wrap(~spatial,
+             scales = "free",
+             nrow = 2)
+
+cowplot::plot_grid(bio.plot, region.plot, ncol = 1)
+```
+## 2) Watershed Mean Score
+
+
+```{r}
+mean.rating.df <- loop_cell_rating(bibi.periods, su.df,
+                                   unit.col = "stream_miles",
+                                   su.vec = c("huc12"),
+                                   job = "mean_rating") %>% 
+  arrange(spatial_period) %>% 
+  mutate(spatial_period = factor(spatial_period, levels = rev(unique(spatial_period)))) %>% 
+  arrange(spatial_period)
+
+mean.bar <- plot_rating(mean.rating.df, "Mean Rating") +
+  facet_wrap(~su, ncol = 1)
+```
+
+```{r}
+mean.rating.exc <- exclude_insufficient(mean.rating.df, spatial_period, method, su)
+
+mean.bar.exc <- plot_rating(mean.rating.exc, "Mean Rating (Insufficient Excluded)") +
+  facet_wrap(~su, ncol = 1)
+```
+
+```{r, fig.width = 8, fig.height=10}
+cowplot::plot_grid(mean.bar, mean.bar.exc, ncol = 1)
+```
+
+```{r}
+join_cells(bibi.periods, su.df, "huc12", "stream_miles") %>% 
+  mean_cell_rating(huc12, stream_miles) %>% 
+  spatial_stacked()
+```
+
+
+## 3) Ratings Weighted by Stream Mile
+
+
+```{r}
+stream.weight.rating.df <- loop_cell_rating(bibi.periods, su.df,
+                                            unit.col = "stream_miles",
+                                            su.vec = c("huc12"),
+                                            job = "weighted_rating") %>% 
+  arrange(spatial_period) %>% 
+  mutate(spatial_period = factor(spatial_period, levels = rev(unique(spatial_period)))) %>% 
+  arrange(spatial_period)
+
+sm.bar <- plot_rating(stream.weight.rating.df, "Weighted by Stream Mile") +
+  facet_wrap(~su, ncol = 1)
+```
+
+```{r}
+stream.weight.rating.exc <- exclude_insufficient(stream.weight.rating.df,
+                                                 spatial_period, method, su)
+
+sm.bar.exc <- plot_rating(stream.weight.rating.exc,
+                          "Weighted by Stream Mile (Insufficient Excluded)") +
+  facet_wrap(~su, ncol = 1)
+```
+
+```{r, fig.width = 8, fig.height=10}
+cowplot::plot_grid(sm.bar, sm.bar.exc , ncol = 1)
+```
+
+```{r}
+join_cells(bibi.periods, su.df, "huc12", "stream_miles") %>% 
+  weighted_cell_rating(huc12, stream_miles) %>% 
+  spatial_stacked()
+```
+
+
+## 4) Random Sample
+
+```{r, fig.width=8, fig.height=10}
+set.seed(1018) # sample(1:10000, 1)
+rand.samp.rating.df <- loop_sample_ratings(bibi.periods, su.df,
+                                           su.vec = c("huc12"),
+                                           su.density.quantile = 0.1,
+                                           reps = 1,
+                                           boot.sample.vec = 100,
+                                           spatial.vec,
+                                           periods.vec) %>% 
+  arrange(spatial_period) %>% 
+  mutate(spatial_period = factor(spatial_period, levels = rev(unique(spatial_period)))) %>% 
+  arrange(spatial_period) %>% 
+  filter(bootstrap_sample == 100)
+
+rand.bar <- plot_rating(rand.samp.rating.df,
+                        title = "Random Sample",
+                        y = percentage) +
+  facet_wrap(~su, ncol = 1)
+```
+
+```{r}
+rand.samp.rating.exc <- exclude_insufficient(rand.samp.rating.df,
+                                             spatial_period, su)
+
+rand.bar.exc <- plot_rating(rand.samp.rating.exc,
+                            "Random Sample (Insufficient Excluded)") +
+  facet_wrap(~su, ncol = 1)
+```
+
+```{r, fig.width = 8, fig.height=10}
+cowplot::plot_grid(rand.bar, rand.bar.exc , ncol = 1)
+```
+
+## 5) Bootstrap
+```{r, fig.width=8, fig.height=10}
+set.seed(1018) # sample(1:10000, 1)
+boot.rating.df <- loop_sample_ratings(bibi.periods, su.df,
+                                      su.vec = c("huc12"),
+                                      su.density.quantile = 0.1,
+                                      reps = 100,
+                                      boot.sample.vec = 100) %>% 
+  arrange(spatial_period) %>% 
+  mutate(spatial_period = factor(spatial_period, levels = rev(unique(spatial_period)))) %>% 
+  arrange(spatial_period) %>% 
+  filter(bootstrap_sample == 100)
+
+
+boot.bar <- plot_rating(boot.rating.df,
+                        title = "Bootstrap",
+                        y = percentage) +
+  facet_wrap(~su, ncol = 1)
+```
+
+```{r}
+boot.rating.exc <- exclude_insufficient(boot.rating.df,
+                                        spatial_period, su, job = "bootstrap")
+
+boot.bar.exc <- plot_rating(boot.rating.exc,
+                            "Bootstrap (Insufficient Excluded)") +
+  facet_wrap(~su, ncol = 1) 
+```
+
+```{r, fig.width = 8, fig.height=10}
+cowplot::plot_grid(boot.bar, boot.bar.exc , ncol = 1)
+```
+
