@@ -11,15 +11,30 @@ knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
 
 The R-code chunks below, are simply applying the functions described in the [Methods] Section. 
 
+## Define Baseline Periods
+
+Use `assign_periods()` to assign two potential sampling periods to represent the 2008 baseline period, 2000-2008 and 2004-2008. [Appendix C] explored the temporal distribution of samples in the Chessie BIBI database and indicated that there is a substantial amount of data avialable for these time periods. The 2000-2008 time period was selected because there is a significant increase in the amount of sampling events in the 2000's relative to the 1990's. The 2004-2008 time period is centered around the 2006 National Land Cover Date (NLCD) and was used by @MaloneyPredictingStreambiologicalpublicationpending.
+```{r}
+bibi.sub <- assign_periods(bibi.df, c("2000_2008", "2004_2008"))
+```
+
 ## 1) No Spatial Aggregation
 
 With no spatial aggregation, each of the indices and potential baseline periods produce comparable results (± 1%). "Insufficient" was not represented by this method because this method does not account for any spatial information. Therefore, there can be no estimate of the percentage of streams that are insufficiently sampled.
-```{r}
+```{r, fig.width = 8, fig.height=5}
 rating.no.spatial <- no_spatial_rating(bibi.sub, su.df)
 
 no.spatial.bar <- plot_rating(rating.no.spatial, "Individual Sample Ratings", group.col = NULL)
 
 no.spatial.bar
+```
+
+```{r, include=FALSE}
+ggsave("stacked_no_spatial.png",
+       plot = no.spatial.bar,
+       width = 8,
+       height = 5,
+       path = file.path(project.dir, "markdown/presentation/images/stacked_bar"))
 ```
 
 ## 2) Watershed Mean Score
@@ -46,32 +61,24 @@ mean.bar.exc <- plot_rating(mean.rating.exc, "Mean Rating (Insufficient Excluded
 cowplot::plot_grid(mean.bar, mean.bar.exc, ncol = 1)
 ```
 
+```{r, include=FALSE}
+ggsave("stacked_mean_insufficient.png",
+       plot = mean.bar,
+       width = 8,
+       height = 5,
+       path = file.path(project.dir, "markdown/presentation/images/stacked_bar"))
+
+ggsave("stacked_mean.png",
+       plot = mean.bar.exc,
+       width = 8,
+       height = 5,
+       path = file.path(project.dir, "markdown/presentation/images/stacked_bar"))
+```
 
 ## 3) Ratings Weighted by Area or Stream Mile
 
 The percentage of the Chesapeake Bay basin within insufficient samples increases as spatial resolution increases from HUC 8 to Catchment. Removing the percentage of Insufficient, allows the percentages from each spatial resolution to be directly compared. In general, percentage of each rating category were similar for all indices and potential baseline periods within a given spatial resolution (i.e., HUC 8, HUC 10, HUC 12, and Catchment). The percentage of streams classified as Acceptable deceased has spatial resolution increased. Fair classifications also declined slightly with an increase in spatial resolution. The reduction in these two classifications led to the increase percentage of Degraded streams.
-```{r}
-area.weight.rating.df <- loop_cell_rating(bibi.sub, su.df,
-                                   unit.col = "area",
-                                   su.vec = c("huc8", "huc10", "huc12", "catchment"),
-                                   job = "weighted_rating")
 
-aw.bar <- plot_rating(area.weight.rating.df, "Weighted by Cell Area") +
-  facet_wrap(~su, ncol = 1)
-```
-
-```{r}
-area.weight.rating.exc <- exclude_insufficient(area.weight.rating.df,
-                                               spatial_period, method, su)
-
-aw.bar.exc <- plot_rating(area.weight.rating.exc,
-                            "Weighted by Cell Area (Insufficient Excluded)") +
-  facet_wrap(~su, ncol = 1)
-```
-
-```{r, fig.width = 8, fig.height=10}
-cowplot::plot_grid(aw.bar, aw.bar.exc , ncol = 1)
-```
 
 ```{r}
 stream.weight.rating.df <- loop_cell_rating(bibi.sub, su.df,
@@ -84,7 +91,7 @@ sm.bar <- plot_rating(stream.weight.rating.df, "Weighted by Stream Mile") +
 ```
 
 ```{r}
-stream.weight.rating.exc <- exclude_insufficient(area.weight.rating.df,
+stream.weight.rating.exc <- exclude_insufficient(stream.weight.rating.df,
                                                spatial_period, method, su)
 
 sm.bar.exc <- plot_rating(stream.weight.rating.exc,
@@ -94,6 +101,20 @@ sm.bar.exc <- plot_rating(stream.weight.rating.exc,
 
 ```{r, fig.width = 8, fig.height=10}
 cowplot::plot_grid(sm.bar, sm.bar.exc , ncol = 1)
+```
+
+```{r, include=FALSE}
+ggsave("stacked_weighted_insufficient.png",
+       plot = sm.bar,
+       width = 8,
+       height = 5,
+       path = file.path(project.dir, "markdown/presentation/images/stacked_bar"))
+
+ggsave("stacked_weighted.png",
+       plot = sm.bar.exc,
+       width = 8,
+       height = 5,
+       path = file.path(project.dir, "markdown/presentation/images/stacked_bar"))
 ```
 
 ## 4) Random Sample
@@ -129,6 +150,20 @@ rand.bar.exc <- plot_rating(rand.samp.rating.exc,
 cowplot::plot_grid(rand.bar, rand.bar.exc , ncol = 1)
 ```
 
+```{r, include=FALSE}
+ggsave("stacked_random_sample_insufficient.png",
+       plot = rand.bar,
+       width = 8,
+       height = 5,
+       path = file.path(project.dir, "markdown/presentation/images/stacked_bar"))
+
+ggsave("stacked_random_sample.png",
+       plot = rand.bar.exc,
+       width = 8,
+       height = 5,
+       path = file.path(project.dir, "markdown/presentation/images/stacked_bar"))
+```
+
 ## 5) Bootstrap
 
 The percentage of the Chesapeake Bay basin within insufficient samples increases as spatial resolution increases from HUC 8 to Catchment. Removing the percentage of Insufficient, allows the percentages from each spatial resolution to be directly compared. In general, percentage of each rating category were similar for all indices and potential baseline periods within a given spatial resolution (i.e., HUC 8, HUC 10, HUC 12, and Catchment).
@@ -139,7 +174,7 @@ set.seed(1018) # sample(1:10000, 1)
 boot.rating.df <- loop_sample_ratings(bibi.sub, su.df,
                             su.vec = c("huc8", "huc10", "huc12", "catchment"),
                             su.density.quantile = 0.1,
-                            reps = 5000,
+                            reps = 100,
                             boot.sample.vec = NA,
                             spatial.vec = c("region", "bioregion"),
                             periods.vec = c("2000_2008", "2004_2008"))
@@ -172,6 +207,20 @@ plot_boot_bar_sd(boot.rating.exc) +
 ```{r, fig.width = 8, fig.height=8}
 plot_sd_lines(boot.rating.exc, "Bootstrap Standard Deviation") +
   facet_wrap(~spatial_period, ncol = 1)
+```
+
+```{r, include=FALSE}
+ggsave("stacked_boot_insufficient.png",
+       plot = boot.bar,
+       width = 8,
+       height = 5,
+       path = file.path(project.dir, "markdown/presentation/images/stacked_bar"))
+
+ggsave("stacked_boot.png",
+       plot = boot.bar.exc,
+       width = 8,
+       height = 5,
+       path = file.path(project.dir, "markdown/presentation/images/stacked_bar"))
 ```
 
 ## 6) Random Forest
