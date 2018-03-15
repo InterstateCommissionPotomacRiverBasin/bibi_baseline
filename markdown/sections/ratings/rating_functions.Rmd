@@ -11,6 +11,32 @@ knitr::opts_chunk$set(eval=evaluate, cache=cache.me)
 
 This section describes a set of general methods, and associated functions, used to manipulate, summarize, or plot data for two or more of the rating methodologies.
 
+## Assign Sampling Periods
+
+Generally, the data providers could not sample their entire sampling area in one year. Therefore, the data needs to be aggregated to multi-year periods to establish a 2008 baseline and to evaluate trends. `assign_periods()` makes it simple to supply a long data frame of Chessie BIBI ratings (`bibi.df`) and a vector of sampling periods (`periods.vec`) to aggregate the data frame by. `purrr::map_df()` is used to loop through each string element of the supplied `periods.vec`. The strings supplied for `periods.vec` must be in the format of "year_year" (e.g., "2000_2008"). This standard format enables the `periods.vec` strings to be split by "_" using `stringr::str_split()`, ultimately providing to years (e.g. `c("2000", "2008")`). By splitting the string into individual years and storing them as a vector (`split.vec`) makes it simple to call on these years to filter the supplied long data frame (`bibi.df`). The `year` is extracted from the `date` column in `bibi.df`. The first element of `split.vec` should always be the earlier of the two years supplied as the sampling period bounds, and thus the second element should be the later of the two years. Given this information, the elements of split vec can be used to subset the `bibi.df` using `dplyr::filter()`. A `period` column is created and populated with the appropreiate sampling period. Finally, the spatial resolution (`spatial`) and the sampling period (`period`) columns are concatenated to form a new column `spatial_period`. This column will make it easier to aggregate by spatial resolution and sampling period.
+```{r}
+assign_periods <- function(bibi.df, periods.vec) {
+  final.df <- purrr::map_df(periods.vec, function(period.i) {
+  split.vec <- period.i %>% 
+  stringr::str_split("_") %>%  
+  unlist() %>% 
+  as.numeric()
+  
+  period.df <- bibi.df %>% 
+  mutate(year = lubridate::year(date)) %>% 
+  filter(year >= split.vec[1],
+         year <= split.vec[2]) %>% 
+    mutate(period = period.i)
+}) %>% 
+  select(period, everything()) %>% 
+    unite(spatial_period, spatial, period, remove = FALSE) %>% 
+    mutate(period = factor(period, levels = periods.vec))
+
+  return(final.df)
+}
+```
+
+
 ## Rating Classification
 
 Several functions are created to apply the appropriate rating to a BIBI score. The Chessie BIBI data (`bibi.df`) already contains the appropriate rating for each sampling event but if the scores are manipulated in any way, such as averaged together by HUC 12 (see [HUC 12 Mean Score]), then modified scores need to be classified with the appropriate rating. Three functions are created to classify the scores at three different resolutions: High (`rate_index_6()`), Medium (`rate_index_4()`), and Low (`rate_index_3()`).

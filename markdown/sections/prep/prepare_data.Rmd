@@ -180,39 +180,11 @@ bibi.df <- bibi.df %>%
   filter(!catchment %in% catchment.vec)
 ```
 
-## Create Baseline Periods
-
-Create a list of data frames representing two potential time periods (i.e., 2000-2008 or 2004-2008) for establishing the 2008 baseline. [Appendix C] explored the temporal distribution of samples in the Chessie BIBI database and indicated that there is a substantial amount of data avialable for these time periods. The 2000-2008 time period was selected because there is a significant increase in the amount of sampling events in the 2000's relative to the 1990's. The 2004-2008 time period is centered around the 2006 National Land Cover Date (NLCD) and was used by @MaloneyPredictingStreambiologicalpublicationpending.
-```{r}
-bibi.list <- list()
-
-bibi.list$bibi.0008 <- bibi.df %>% 
-  filter(date >= "2000-01-01",
-         date < "2009-01-01") %>% 
-  mutate(period = "2000_2008")
-
-bibi.list$bibi.0408 <- bibi.df %>% 
-  filter(date >= "2004-01-01",
-         date < "2009-01-01") %>% 
-  mutate(period = "2004_2008")
-```
-
-Join the list of data frames into a single data frame.
-```{r}
-bibi.sub <- bind_rows(bibi.list)
-```
-
-Concatenate the spatial resolution (`spatial`) with the sampling period (`period`) to form a new column `spatial_period`. This column will make it easier to aggregate by spatial resolution and sampling period.
-```{r}
-bibi.sub <- bibi.sub %>% 
-  unite(spatial_period, spatial, period, remove = FALSE)
-```
-
 ## Aggregate Ratings
 
 The Chessie BIBI has five rating categories (i.e., Excellent, Good, Fair, Poor, and Very Poor). However, the Chesapeake Bay Program is only interested in the percentage of Excellent and Good versus Poor and Very Poor. The ratings are reclassified to reflect the Chesapeake Bay Programs needs. "Degraded" is used to represent the combination of Poor and Very Poor, while "Acceptable" is used to represent Excellent and Good. The Fair category will be used as a gray-zone between the two categories of interest. 
 ```{r}
-bibi.sub <- bibi.sub %>% 
+bibi.df <- bibi.df %>% 
   mutate(rating = case_when(
     rating %in% c("excellent", "good") ~ "Acceptable",
     rating %in% c("fair") ~ "Fair",
@@ -221,9 +193,6 @@ bibi.sub <- bibi.sub %>%
     ))
 ```
 
-```{r, include=FALSE}
-rm(bibi.list, bibi.count, count.bar, region.bar, bioregion.bar)
-```
 
 
 
