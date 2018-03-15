@@ -39,7 +39,6 @@ The Chessie BIBI scores and ratings are aggregated by a spatial unit (HUC8, HUC1
 
 #### Mean Cell Rating Function
 
-`mean_cell_rating()` makes it possible to calculate the mean Chessie BIBI score for each spatial unit cell, assign the appropriate Chessie BIBI rating based on the mean score, and summarize the results to represent the proportion of each rating represented in the Chesapeake Bay basin.
 ```{r}
 mean_cell_rating <- function(bibi.df, su.col, unit.col) {
   su.col <- rlang::enquo(su.col)
@@ -53,6 +52,23 @@ mean_cell_rating <- function(bibi.df, su.col, unit.col) {
               rlang::UQ(rlang::quo_name(unit.col)) := mean(!!unit.col)) %>% 
     ungroup() %>%  
     mutate(rating = rate_index_4(., mean_score)) %>% 
+    group_by(spatial_period) %>% 
+    mutate(total = n()) %>% 
+    ungroup()
+  
+  return(final.df)
+}
+```
+
+
+`summarize_mean_cell_rating()` makes it possible to calculate the mean Chessie BIBI score for each spatial unit cell, assign the appropriate Chessie BIBI rating based on the mean score, and summarize the results to represent the proportion of each rating represented in the Chesapeake Bay basin.
+```{r}
+summarize_mean_cell_rating <- function(bibi.df, su.col, unit.col) {
+  su.col <- rlang::enquo(su.col)
+  unit.col <- rlang::enquo(unit.col)
+  
+  final.df <-  bibi.df %>% 
+    mean_cell_rating(!!su.col, !!unit.col) %>% 
     group_by(spatial_period) %>% 
     mutate(total = n()) %>% 
     ungroup() %>% 
@@ -92,7 +108,20 @@ weighted_cell_rating <- function(bibi.df, su.col, unit.col) {
     group_by(spatial_period, !!su.col) %>% 
     mutate(count = n()) %>% 
     ungroup() %>%  
-    mutate(weight = (!!unit.col) / count) %>% 
+    mutate(weight = (!!unit.col) / count)
+}
+```
+
+```{r}
+#bibi.df <- bibi.cell
+#su.col <- quo(huc12)
+#unit.col <- quo(area)
+summary_weighted_cell_rating <- function(bibi.df, su.col, unit.col) {
+  su.col <- enquo(su.col)
+  unit.col <- enquo(unit.col)
+  
+  final.df <- bibi.df %>% 
+    weighted_cell_rating(!!su.col, !!unit.col) %>% 
     group_by(spatial_period, rating, total) %>% 
     summarize(weight = sum(weight)) %>% 
     ungroup() %>%
@@ -106,12 +135,30 @@ weighted_cell_rating <- function(bibi.df, su.col, unit.col) {
 }
 ```
 
+#### Join Cells Function
+
+The Chessie BIBI data frame (`bibi.df`) needs to be joined with the spatial unit data frame (`su.df`) to represent all spatial unit cells in the Chesapeake Bay basin, not just those that have Chessie BIBI data. `join_cells()` makes it possible to join these two data frames together and make sure that each unique `spatial_period` represents all spatial unit cells in the basin. `aggregate_su()` is used summarize the spatial unit data frame (`su.df`) based on the specified spatial unit column (`su.col`, e.g., HUC 12) and unit column (`unit.col`, e.g., stream miles) input variables ([Summarize Spatial Unit Features]). `dplyr::full_join()` is used to join all of the data from both data frames together into a single data frame. To make sure each `spatial_period` representes all of the spatial unit cells in the basin (`su.col`) and the associated units (`unit.col`), `tidyr::complete()` is used to create any missing `spatial_period` and `su.col` combinations.
+```{r}
+join_cells <- function(bibi.df, su.df, su.col, unit.col) {
+  su.col <- rlang::sym(su.col)
+  unit.col <- rlang::sym(unit.col)
+  
+  cell.df <- aggregate_su(su.df, !!su.col, !!unit.col)
+    #--------------------------------------------------------------------------
+    bibi.cell <- bibi.df %>% 
+      full_join(cell.df, by = rlang::quo_name(su.col)) %>% 
+      complete(spatial_period, nesting((!!su.col), (!!unit.col), total)) %>% 
+      filter(!is.na(spatial_period))
+}
+
+```
+
 #### Loop Cell Rating Function
 
-`loop_cell_rating()` is essentially a wrapper for `mean_cell_rating()` and `weighted_cell_rating()`. The user can specify the function they want to use (`job = "mean_rating"` or `job = "weighted_rating"`) and a set of two or more spatial unit resolutions (e.g., HUC 8, HUC 10, HUC 12, or catchments). This function will then cycle through each spatial unit resolution performing the specified job and returning a single data frame containing the results from each spatial unit resolution.
+`loop_cell_rating()` is essentially a wrapper for `summarize_mean_cell_rating()` and `summary_weighted_cell_rating()`. The user can specify the function they want to use (`job = "mean_rating"` or `job = "weighted_rating"`) and a set of two or more spatial unit resolutions (e.g., HUC 8, HUC 10, HUC 12, or catchments). This function will then cycle through each spatial unit resolution performing the specified job and returning a single data frame containing the results from each spatial unit resolution.
 ```{r}
 #bibi.df <- bibi.sub
-#unit.col <- "area"
+#unit.col <- "stream_miles"
 #su.i <- "huc12"
 #job <- "weighted_rating"
 
@@ -121,19 +168,14 @@ loop_cell_rating <- function(bibi.df, su.df, unit.col, su.vec, job) {
   purrr::map_df(su.vec, function(su.i) {
     su.i <- rlang::sym(su.i)
     
-    cell.df <- aggregate_su(su.df, !!su.i, !!unit.col)
-    #--------------------------------------------------------------------------
-    bibi.cell <- bibi.df %>% 
-      full_join(cell.df, by = rlang::quo_name(su.i)) %>% 
-      complete(spatial_period, nesting(!!su.i, !!unit.col, total)) %>% 
-      filter(!is.na(spatial_period))
+    bibi.cell <- join_cells(bibi.df, su.df, quo_name(su.i), quo_name(unit.col))
     #--------------------------------------------------------------------------
     if (job == "mean_rating") {
-      final.df <- mean_cell_rating(bibi.cell, !!su.i, !!unit.col)
+      final.df <- summarize_mean_cell_rating(bibi.cell, !!su.i, !!unit.col)
     } 
     
     if (job == "weighted_rating") {
-      final.df <- weighted_cell_rating(bibi.cell, !!su.i, !!unit.col)
+      final.df <- summary_weighted_cell_rating(bibi.cell, !!su.i, !!unit.col)
     } 
     #--------------------------------------------------------------------------
     final.df <- final.df %>% 
@@ -143,7 +185,8 @@ loop_cell_rating <- function(bibi.df, su.df, unit.col, su.vec, job) {
   }) %>% 
     ungroup() %>% 
   group_by(spatial_period, method) %>% 
-  mutate(total_miles = sum(!!unit.col, na.rm = TRUE))
+  mutate(total_miles = sum(!!unit.col, na.rm = TRUE)) %>% 
+    ungroup()
 }
 
 ```
