@@ -1,8 +1,14 @@
 ---
-title: "R Notebook"
+title: ""
 output:
   html_document:
     df_print: paged
+    toc: yes
+    toc_depth: '6'
+    toc_float: yes
+  word_document:
+bibliography: citations.bib
+link-citations: true
 ---
 
 ```{r child = 'master.Rmd', eval=TRUE}

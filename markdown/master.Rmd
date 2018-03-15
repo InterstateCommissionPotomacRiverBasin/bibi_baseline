@@ -1,6 +1,5 @@
 ---
-title: "Developing a 2008 Baseline for the CBP Stream Health Outcome Indicator: DRAFT"
-author: "Zachary M. Smith"
+title: ""
 output:
   html_document:
     df_print: paged
@@ -11,13 +10,42 @@ output:
 bibliography: citations.bib
 link-citations: true
 ---
+<center>
+__Developing a 2008 Baseline for the CBP Stream Health Outcome Indicator: DRAFT__
+
+<br>
+<br>
+
+Zachary M. Smith and Claire Buchanan
+
+__Draft Report__
 
 `r Sys.Date()`
 
+Interstate Commission on the Potomac River Basin (ICPRB)
+
+30 West Gude Drive, Suite 450
+
+Rockville, MD 20850
+
+[www.potomacriver.org](www.potomacriver.org)
+
+<br>
+<br>
+
+![](D:/ZSmith/Projects/Chessie_BIBI/bibi_baseline/bibi_baseline/data/logo/icprb_logo.png){width=20%}
+
+<br>
+<br>
+
+![](D:/ZSmith/Projects/Chessie_BIBI/bibi_baseline/bibi_baseline/data/logo/cbp_logo.png){width=20%}
+</center>
+
+
 ```{r, echo=FALSE, cache=FALSE}
 evaluate <- TRUE
-cache.me <- TRUE
-cache.dir <- file.path(rprojroot::find_rstudio_root_file(), "sections/cache/")
+cache.me <- FALSE
+cache.dir <- file.path(rprojroot::find_rstudio_root_file(), "markdown/sections/cache")
 run.cedr.acquisition <- FALSE
 ```
 
@@ -44,7 +72,7 @@ knitr::opts_chunk$set(cache.path=cache.dir)
 # Methods
 
 The R scripts and functions below should enable anyone to re-create the results found in this document. Associated with each script and function is a brief description of what the code does. This document was created using __RMarkdown__, to intertwin R codes and text. For more information about R, __R Markdown__, and how to work with or edit this document please review [Appendix A]
-```{r child = 'sections/appendix/appendicies/appendix_a_methods_r.Rmd', eval=TRUE, echo=FALSE}
+```{r child = 'sections/appendix/appendicies/appendix_a_methods_r.Rmd', eval=TRUE, include=FALSE}
 
 ```
 
@@ -80,7 +108,9 @@ Data will eventually be acquired from the Chesapeake Bay Program Chesapeake Envi
 ```
 
 # Conclusions and Recommendations
+```{r child = 'sections/conclusions/conclusions_recommendations.Rmd', eval=TRUE}
 
+```
 
 # Citations
 

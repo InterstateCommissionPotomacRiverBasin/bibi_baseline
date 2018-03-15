@@ -13,7 +13,7 @@ link-citations: true
 ---
 ```{r, echo=FALSE, cache=FALSE}
 evaluate <- TRUE
-cache.me <- TRUE
+cache.me <- FALSE
 cache.dir <- file.path(rprojroot::find_rstudio_root_file(), "sections/cache/")
 run.cedr.acquisition <- FALSE
 ```
@@ -39,7 +39,8 @@ knitr::opts_chunk$set(cache.path=cache.dir)
 
 ```
 
-```{r}
-getwd()
+# Appendix X
+```{r child = 'appendicies/appendix_x_trends.Rmd', eval=TRUE}
+
 ```
 
